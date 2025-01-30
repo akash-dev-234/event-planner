@@ -5,11 +5,19 @@ from flask_sqlalchemy import SQLAlchemy
 app = Flask(__name__)
 
 # Configure SQLite Database URI
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'  # SQLite file will be created in the project folder
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # To disable unnecessary warnings
+app.config["SQLALCHEMY_DATABASE_URI"] = (
+    "sqlite:///database.db"  # SQLite file will be created in the project folder
+)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False  # To disable unnecessary warnings
 
 # Initialize SQLAlchemy
 db = SQLAlchemy(app)
 
-if __name__ == '__main__':
+
+@app.route("/")
+def home():
+    return "Welcome to the Flask app!"
+
+
+if __name__ == "__main__":
     app.run(debug=True)
