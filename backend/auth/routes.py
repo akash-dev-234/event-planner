@@ -1,9 +1,12 @@
 from datetime import timedelta
+import os
 import re
+
+from flask_mail import Message
 from . import auth
-from flask import request, jsonify, session
+from flask import request, jsonify
 from backend.auth.models import User
-from backend.extensions import db
+from backend.extensions import db, mail, bcrypt
 
 # re is a built-in Python module that provides support for working with regular expressions (regex).
 # Regular expressions are a powerful tool for matching patterns in strings,
@@ -103,3 +106,75 @@ def login():
         return jsonify({"message": "Logged in", "token": token}), 200
 
     return jsonify({"message": "Login page"})
+
+
+@auth.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    print("Forgot password route hit")
+    data = request.get_json()
+    email = data.get("email")
+
+    print(f"MAIL_DEFAULT_SENDER: {os.environ.get('MAIL_USERNAME')}")
+
+    # Validate email format
+    if not email or not is_valid_email(email):
+        return jsonify({"message": "Invalid email format."}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if user is None:
+        return jsonify({"message": "User with this email does not exist."}), 404
+
+    # Generate a password reset token
+    token = user.generate_reset_token()
+
+    # Send email with the reset token
+    msg = Message(
+        "Password Reset Request",
+        sender=os.environ.get("MAIL_USERNAME"),
+        recipients=[email],
+    )
+    msg.body = f"To reset your password, visit the following link:  http://localhost:5000/reset-password/{token}"
+
+    try:
+        mail.send(msg)
+    except Exception as e:
+        return jsonify({"message": f"Failed to send email: {str(e)}"}), 500
+
+    return (
+        jsonify({"message": "A password reset link has been sent to your email."}),
+        200,
+    )
+
+
+@auth.route("/reset-password/<token>", methods=["POST"])
+def reset_password(token):
+    data = request.get_json()
+    new_password = data.get("password")
+
+    # Validate the new password
+    if not new_password or not is_strong_password(new_password):
+        return (
+            jsonify(
+                {
+                    "error": "Password must be at least 8 characters long and include uppercase, lowercase, numeric, and special characters."
+                }
+            ),
+            400,
+        )
+
+    # Verify the reset token
+    user = User.verify_reset_token(token)
+    if user is None:
+        return jsonify({"error": "Invalid or expired token."}), 400
+
+    if user.check_password(new_password):
+        return (
+            jsonify({"error": "New password cannot be the same as the old password."}),
+            400,
+        )
+
+    # Update the user's password
+    user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    db.session.commit()
+
+    return jsonify({"message": "Your password has been updated!"}), 200
