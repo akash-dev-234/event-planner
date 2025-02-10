@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 def create_app():
     app = Flask(__name__)
     load_dotenv()
-
+    backend_dir = os.path.abspath(os.path.dirname(__file__))
     # Configure SQLite Database URI
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URI")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -29,7 +29,8 @@ def create_app():
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
-    migrate.init_app(app, db)
+    migrations_dir = os.path.join(backend_dir, "migrations")
+    migrate.init_app(app, db, directory=migrations_dir)
     mail.init_app(app)
 
     # Register blueprints

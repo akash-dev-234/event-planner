@@ -1,11 +1,12 @@
 from datetime import timedelta
 import os
 import re
-
+from flask_jwt_extended import get_jwt_identity
 from flask_mail import Message
+from backend.auth.decorators import role_required
 from . import auth
 from flask import request, jsonify
-from backend.auth.models import User
+from backend.auth.models import Organization, User, UserRole
 from backend.extensions import db, mail, bcrypt
 
 # re is a built-in Python module that provides support for working with regular expressions (regex).
@@ -42,7 +43,7 @@ def register():
             password = data["password"]
             role = data.get("role", "guest")  # Default to guest if not provided
             # Validate role
-            if role not in ["organization", "team_member", "guest", "admin"]:
+            if role not in UserRole:
                 return jsonify({"error": "Invalid role specified."}), 400
         except KeyError as e:
             return jsonify({"error": f"Missing form field: {str(e)}"}), 400
@@ -74,6 +75,7 @@ def register():
             first_name=first_name,
             last_name=last_name,
             role=role,
+            organization_id=None,
         )
         db.session.add(new_user)
         db.session.commit()
@@ -178,3 +180,55 @@ def reset_password(token):
     db.session.commit()
 
     return jsonify({"message": "Your password has been updated!"}), 200
+
+
+@auth.route("/create-organization", methods=["POST"])
+@role_required("organizer")  # Ensure the user has the organizer role
+def create_organization():
+    print("Entering create_organization")
+    current_user = get_jwt_identity()  # Get the current user's identity
+    print(current_user)
+
+    user_id = current_user["id"]  # Assuming the user's ID is stored in the JWT
+
+    data = request.get_json()
+    organization_name = data.get("name")
+    organization_description = data.get("description")
+
+    if not organization_name:
+        return jsonify({"error": "Organization name is required."}), 400
+
+    # Step 1: Create the organization
+    new_organization = Organization(
+        name=organization_name, description=organization_description
+    )
+    db.session.add(new_organization)
+
+    try:
+        db.session.commit()  # Attempt to commit the new organization
+
+        # Step 2: Update the user's organization ID
+        user = User.query.get(user_id)  # Get the current user from the database
+        user.organization_id = new_organization.id  # Set the organization ID
+        db.session.commit()  # Save the changes to the user
+
+        return (
+            jsonify(
+                {
+                    "message": "Organization created successfully!",
+                    "organization_id": new_organization.id,
+                }
+            ),
+            201,
+        )
+
+    except Exception as e:
+        db.session.rollback()  # Rollback the session in case of an error
+        return (
+            jsonify(
+                {
+                    "error": f"An error occurred while creating the organization: {str(e)}"
+                }
+            ),
+            500,
+        )
