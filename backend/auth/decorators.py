@@ -1,5 +1,5 @@
 # Decorator to protect routes based on user roles.
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from functools import wraps
 from flask import jsonify
 
@@ -9,16 +9,14 @@ def role_required(required_role):
         @wraps(fn)
         @jwt_required()
         def wrapper(*args, **kwargs):
-            current_user = (
-                get_jwt_identity()
-            )  # Get the current user's identity from the JWT
-            if current_user["role"] != required_role:
+            jwt_data = get_jwt()
+            user_role = jwt_data.get('role')
+            
+            if not user_role or user_role != required_role:
                 return (
                     jsonify({"error": "Access denied: insufficient permissions"}),
                     403,
                 )
             return fn(*args, **kwargs)
-
         return wrapper
-
     return decorator

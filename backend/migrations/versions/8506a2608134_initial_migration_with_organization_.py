@@ -1,8 +1,8 @@
-"""Add organization_id to user table
+"""Initial migration with Organization model
 
-Revision ID: 07314e31f601
+Revision ID: 8506a2608134
 Revises: 
-Create Date: 2025-02-05 16:07:43.199257
+Create Date: 2025-02-22 17:52:25.817236
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '07314e31f601'
+revision = '8506a2608134'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -22,6 +22,8 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=150), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )

@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, jsonify, request
 from backend.extensions import db, bcrypt, jwt, migrate, mail
 from backend.auth import auth
 from dotenv import load_dotenv
@@ -8,6 +8,16 @@ from dotenv import load_dotenv
 def create_app():
     app = Flask(__name__)
     load_dotenv()
+    
+    # Add these lines for better debugging
+    app.config['DEBUG'] = True
+    app.config['PROPAGATE_EXCEPTIONS'] = True
+
+    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
+    app.config['JWT_TOKEN_LOCATION'] = ['headers']
+    app.config['JWT_HEADER_NAME'] = 'Authorization'
+    app.config['JWT_HEADER_TYPE'] = 'Bearer'    
+    
     backend_dir = os.path.abspath(os.path.dirname(__file__))
     # Configure SQLite Database URI
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URI")
@@ -33,12 +43,16 @@ def create_app():
     migrate.init_app(app, db, directory=migrations_dir)
     mail.init_app(app)
 
+   
+
     # Register blueprints
     app.register_blueprint(auth)
 
     @app.route("/")
     def home():
         return "Welcome to the Flask app!"
+
+
 
     return app
 

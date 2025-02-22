@@ -1,13 +1,14 @@
 from datetime import timedelta
 import os
 import re
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, get_jwt, jwt_required
 from flask_mail import Message
 from backend.auth.decorators import role_required
 from . import auth
 from flask import request, jsonify
 from backend.auth.models import Organization, User, UserRole
 from backend.extensions import db, mail, bcrypt
+from sqlalchemy import func
 
 # re is a built-in Python module that provides support for working with regular expressions (regex).
 # Regular expressions are a powerful tool for matching patterns in strings,
@@ -128,15 +129,40 @@ def forgot_password():
 
     # Generate a password reset token
     token = user.generate_reset_token()
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    reset_url = f"{frontend_url}/reset-password?token={token}"
 
     # Send email with the reset token
     msg = Message(
         "Password Reset Request",
-        sender=os.environ.get("MAIL_USERNAME"),
+        sender=os.environ.get("VERIFIED_EMAIL"),
         recipients=[email],
     )
-    msg.body = f"To reset your password, visit the following link:  http://localhost:5000/reset-password/{token}"
-
+    msg.html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #333; text-align: center;">Password Reset Request</h2>
+            <p style="color: #666; font-size: 16px;">Hello,</p>
+            <p style="color: #666; font-size: 16px;">We received a request to reset your password. If you didn't make this request, you can ignore this email.</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{reset_url}" 
+                   style="background-color: #007bff; 
+                          color: white; 
+                          padding: 12px 25px; 
+                          text-decoration: none; 
+                          border-radius: 4px; 
+                          display: inline-block;">
+                    Reset Password
+                </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">This link will expire in 30 minutes.</p>
+            <p style="color: #666; font-size: 14px;">If you're having trouble clicking the button, copy and paste this URL into your browser:</p>
+            <p style="color: #666; font-size: 14px; word-break: break-all;">{reset_url}</p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+                This email was sent by Event Planner. Please do not reply to this email.
+            </p>
+        </div>
+        """
     try:
         mail.send(msg)
     except Exception as e:
@@ -148,7 +174,7 @@ def forgot_password():
     )
 
 
-@auth.route("/reset-password/<token>", methods=["POST"])
+@auth.route("/reset-password/<token>", methods=["POST","GET"])
 def reset_password(token):
     data = request.get_json()
     new_password = data.get("password")
@@ -183,52 +209,98 @@ def reset_password(token):
 
 
 @auth.route("/create-organization", methods=["POST"])
-@role_required("organizer")  # Ensure the user has the organizer role
+@role_required("organizer")
 def create_organization():
-    print("Entering create_organization")
-    current_user = get_jwt_identity()  # Get the current user's identity
-    print(current_user)
-
-    user_id = current_user["id"]  # Assuming the user's ID is stored in the JWT
-
-    data = request.get_json()
-    organization_name = data.get("name")
-    organization_description = data.get("description")
-
-    if not organization_name:
-        return jsonify({"error": "Organization name is required."}), 400
-
-    # Step 1: Create the organization
-    new_organization = Organization(
-        name=organization_name, description=organization_description
-    )
-    db.session.add(new_organization)
-
     try:
-        db.session.commit()  # Attempt to commit the new organization
+        jwt_data = get_jwt()
+        user_id = jwt_data.get('user_id')
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
 
-        # Step 2: Update the user's organization ID
-        user = User.query.get(user_id)  # Get the current user from the database
-        user.organization_id = new_organization.id  # Set the organization ID
-        db.session.commit()  # Save the changes to the user
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
 
-        return (
-            jsonify(
-                {
-                    "message": "Organization created successfully!",
-                    "organization_id": new_organization.id,
-                }
-            ),
-            201,
+        name = data.get("name")
+        description = data.get("description")
+
+        if not name:
+            return jsonify({"error": "Organization name is required"}), 400
+            
+        if name.strip() == "":
+            return jsonify({"error": "Organization name cannot be empty or just whitespace"}), 400
+
+        # Use the new check_name_exists method
+        if Organization.check_name_exists(name):
+            return jsonify({
+                "error": "An organization with this name already exists"
+            }), 409
+
+        new_organization = Organization(
+            name=name,
+            description=description
         )
-
+        db.session.add(new_organization)
+        user.organization_id = new_organization.id
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Organization created successfully!",
+            "organization": new_organization.to_dict()
+        }), 201
+        
     except Exception as e:
-        db.session.rollback()  # Rollback the session in case of an error
-        return (
-            jsonify(
-                {
-                    "error": f"An error occurred while creating the organization: {str(e)}"
-                }
-            ),
-            500,
-        )
+        print("Error in create_organization:", str(e))
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    
+@auth.route("/organizations/<string:filter_type>", methods=["GET"])
+@jwt_required()
+def get_organizations(filter_type='all'):
+    """
+    Get organizations based on filter type.
+    Filter types:
+    - all: All organizations
+    - active: Only active organizations
+    - deleted: Only deleted organizations
+    """
+    try:
+        if filter_type not in ['all', 'active', 'deleted']:
+            return jsonify({
+                "error": "Invalid filter type. Must be 'all', 'active', or 'deleted'"
+            }), 400
+        
+        # Get organizations based on filter type
+        if filter_type == 'all':
+            organizations = Organization.query.all()
+        elif filter_type == 'active':
+            organizations = Organization.get_active().all()
+        else:  # deleted
+            organizations = Organization.query.filter(
+                Organization.deleted_at.isnot(None)
+            ).all()
+        
+        return jsonify({
+            "message": "Organizations retrieved successfully",
+            "filter_type": filter_type,
+            "count": len(organizations),
+            "organizations": [org.to_dict() for org in organizations] #It's a shorthand way of saying 
+                                                                      #"take each organization in the list and 
+                                                                      # convert it to a dictionary using its to_dict() method".
+        }), 200
+        
+    except Exception as e:
+        print("Error in get_organizations:", str(e))
+        return jsonify({
+            "error": "Failed to retrieve organizations",
+            "details": str(e)
+        }), 500
+
+# Add a default route for all organizations
+@auth.route("/organizations", methods=["GET"])
+@jwt_required()
+def get_all_organizations():
+    """Default route that returns all active organizations"""
+    return get_organizations('active')

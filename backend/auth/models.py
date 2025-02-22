@@ -4,6 +4,7 @@ import os
 from backend.extensions import db, bcrypt
 from flask_jwt_extended import create_access_token
 from itsdangerous import URLSafeTimedSerializer
+from sqlalchemy import func
 
 
 class UserRole(Enum):
@@ -27,10 +28,45 @@ class Organization(db.Model):
     events = db.relationship(
         "Event", backref="organization", lazy=True
     )  # Relationship to events
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
     def __init__(self, name, description=None):
         self.name = name
         self.description = description
+
+    def soft_delete(self):
+        """Mark the organization as deleted"""
+        self.deleted_at = datetime.now(timezone.utc)
+
+    @property
+    def is_deleted(self):
+        """Check if the organization is deleted"""
+        return self.deleted_at is not None
+
+    def to_dict(self):
+        """Convert organization object to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
+            'is_deleted': self.is_deleted
+        }
+
+    @classmethod
+    def get_active(cls):
+        """Get all non-deleted organizations"""
+        return cls.query.filter(cls.deleted_at.is_(None))
+
+    @classmethod
+    def check_name_exists(cls, name):
+        """Check if an active organization with the given name exists"""
+        return cls.query.filter(
+            func.lower(cls.name) == func.lower(name),
+            cls.deleted_at.is_(None)
+        ).first() is not None
 
 
 class User(db.Model):
@@ -72,8 +108,18 @@ class User(db.Model):
     def generate_token(self, expires_delta=None):
         if expires_delta is None:
             expires_delta = timedelta(days=1)
+        
+        # Create additional claims for user data
+        additional_claims = {
+            "user_id": self.id,
+            "role": self.role
+        }
+        
+        # Use email as the subject (must be a string)
         return create_access_token(
-            identity={"id": self.id, "role": self.role}, expires_delta=expires_delta
+            identity=self.email,  # String identity
+            expires_delta=expires_delta,
+            additional_claims=additional_claims  # Add user data as additional claims
         )
 
     def generate_reset_token(self, expires_sec=1800):
