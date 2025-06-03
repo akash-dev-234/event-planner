@@ -19,8 +19,10 @@ def create_app():
     app.config['JWT_HEADER_TYPE'] = 'Bearer'    
     
     backend_dir = os.path.abspath(os.path.dirname(__file__))
-    # Configure SQLite Database URI
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URI")
+    
+    # Use absolute path for database
+    db_path = os.path.join(backend_dir, 'instance', 'database.db')
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "connect_args": {"timeout": 10}  # Increase timeout to 10 seconds
@@ -51,8 +53,6 @@ def create_app():
     @app.route("/")
     def home():
         return "Welcome to the Flask app!"
-
-
 
     return app
 
