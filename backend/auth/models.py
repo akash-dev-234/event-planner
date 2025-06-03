@@ -80,6 +80,7 @@ class User(db.Model):
         db.Integer, db.ForeignKey("organization.id"), nullable=True
     )
     created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    pending_organizer_approval = db.Column(db.Boolean, default=False)
 
     events = db.relationship("Event", backref="organizer", lazy=True)
 
@@ -91,13 +92,15 @@ class User(db.Model):
         last_name,
         organization_id,
         role="guest",
+        pending_organizer_approval=False,
     ):
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
         self.password = bcrypt.generate_password_hash(password).decode("utf-8")
         self.role = role
-        if role == UserRole.ADMIN:
+        self.pending_organizer_approval = pending_organizer_approval
+        if role == UserRole.ADMIN.value:
             self.organization_id = None
         else:
             self.organization_id = organization_id
@@ -172,3 +175,13 @@ class Event(db.Model):
         self.time = time
         self.organization_id = organization_id  # Set the organization ID
         self.user_id = user_id  # Set the user ID (organizer)
+
+
+class OrganizationInvitation(db.Model):
+    id=db.Column(db.Integer, primary_key=True)
+    email=db.Column(db.String(150), nullable=False)
+    role=db.Column(db.String(50), nullable=False, default=UserRole.GUEST)
+    organization_id=db.Column(db.Integer, db.ForeignKey("organization.id"), nullable=False)
+    is_accepted=db.Column(db.Boolean, default=False)
+    created_at=db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    expires_at=db.Column(db.DateTime, nullable=False)
