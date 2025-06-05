@@ -68,6 +68,58 @@ class Organization(db.Model):
             cls.deleted_at.is_(None)
         ).first() is not None
 
+    @classmethod
+    def can_restore(cls, org_id):
+        """Check if an organization can be restored without name conflicts"""
+        deleted_org = cls.query.filter_by(id=org_id).first()
+        if not deleted_org or not deleted_org.is_deleted:
+            return False, "Organization not found or not deleted"
+        
+        # Check if an active organization with the same name exists
+        conflict = cls.query.filter(
+            func.lower(cls.name) == func.lower(deleted_org.name),
+            cls.deleted_at.is_(None),
+            cls.id != org_id
+        ).first()
+        
+        if conflict:
+            return False, f"Cannot restore: An active organization named '{deleted_org.name}' already exists"
+        
+        return True, "Can restore safely"
+
+    @classmethod
+    def create_if_name_available(cls, name, description=None):
+        """Create organization only if name is not taken by active organizations"""
+        if cls.check_name_exists(name):
+            raise ValueError(f"Organization with name '{name}' already exists")
+        return cls(name=name, description=description)
+
+    def restore(self):
+        """Restore a soft-deleted organization if no name conflicts exist"""
+        if not self.is_deleted:
+            raise ValueError("Organization is not deleted")
+        
+        # Check for name conflicts
+        can_restore, message = self.__class__.can_restore(self.id)
+        if not can_restore:
+            raise ValueError(message)
+        
+        self.deleted_at = None
+        return True
+
+    @classmethod
+    def restore_by_id(cls, org_id):
+        """Restore an organization by ID with conflict checking"""
+        org = cls.query.get(org_id)
+        if not org:
+            return False, "Organization not found"
+        
+        try:
+            org.restore()
+            return True, "Organization restored successfully"
+        except ValueError as e:
+            return False, str(e)
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)

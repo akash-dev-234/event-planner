@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import os
 import re
+import traceback
 from flask_jwt_extended import get_jwt, jwt_required
 from flask_mail import Message
 from backend.auth.decorators import admin_or_organizer_required, role_required
@@ -44,10 +45,6 @@ def register():
             password = data["password"]
             requested_role = data.get("role", "guest")  # Default to guest if not specified
             
-            # Check for invitation during registration
-            invitation_email = data.get("invitation_email")
-            org_id = data.get("org_id")
-            
         except KeyError as e:
             return jsonify({"error": f"Missing form field: {str(e)}"}), 400
         except TypeError:
@@ -67,117 +64,104 @@ def register():
                 "error": "Password must be at least 8 characters long and include uppercase, lowercase, numeric, and special characters."
             }), 400
 
-        # Check if there's a pending invitation for this email
-        pending_invitation = None
-        if invitation_email and email == invitation_email and org_id:
-            from backend.auth.models import OrganizationInvitation
-            from datetime import datetime, timezone
-            
-            pending_invitation = OrganizationInvitation.query.filter_by(
-                email=email,
-                organization_id=org_id,
-                is_accepted=False
-            ).filter(
-                OrganizationInvitation.expires_at > datetime.now(timezone.utc)
-            ).first()
-
-        # Handle registration based on invitation status
-        if pending_invitation:
-            # User has a valid invitation - join organization automatically
+        # Handle role assignment securely (no invitation handling)
+        if requested_role == UserRole.ORGANIZER.value:
+            # Organizer role requires admin approval
             new_user = User(
                 email=email,
                 password=password,
                 first_name=first_name,
                 last_name=last_name,
-                role=UserRole.TEAM_MEMBER.value,  # Auto-promote to team_member
-                organization_id=pending_invitation.organization_id,
+                role=UserRole.GUEST.value,  # Start as guest pending approval
+                organization_id=None,
+                pending_organizer_approval=True,  # Mark for admin approval
             )
-            
-            # Mark invitation as accepted
-            pending_invitation.is_accepted = True
             
             db.session.add(new_user)
             db.session.commit()
             
-            organization = Organization.query.get(pending_invitation.organization_id)
+            # Send approval request to admins
+            email_sent = False
+            email_error = None
+            try:
+                notify_admins_organizer_request(new_user)
+                email_sent = True
+            except Exception as e:
+                email_error = str(e)
+                print(f"Admin notification failed: {email_error}")
+
+            # Include email status in response for debugging
+            response_data = {
+                "message": "User created successfully. Your organizer role request has been submitted for admin approval. You will receive an email once reviewed.",
+                "role": UserRole.GUEST.value,
+                "pending_approval": True,
+                "approval_status": "Your organizer request is pending admin approval",
+                "email_notification_sent": email_sent,
+                "next_step": "You can login and check for any pending invitations in your dashboard"
+            }
+
+            if not email_sent and email_error:
+                response_data["email_error"] = email_error
+
+            return jsonify(response_data), 201
+            
+        elif requested_role == UserRole.TEAM_MEMBER.value:
+            # Team member role is not allowed for direct registration
+            return jsonify({
+                "error": "Team member role cannot be selected during registration. Please register as a guest and join organizations through invitations or register as 'guest' and wait for organization invitations"
+            }), 400
+            
+        elif requested_role == UserRole.ADMIN.value:
+            # Admin role is never allowed for self-registration
+            return jsonify({
+                "error": "Admin role cannot be selected during registration. Please register as 'guest' or request 'organizer' approval"
+            }), 400
+            
+        elif requested_role in [UserRole.GUEST.value, "", None]:
+            # Valid guest registration (default)
+            new_user = User(
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                role=UserRole.GUEST.value,
+                organization_id=None,
+            )
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            # Check if user has any pending invitations
+            from backend.auth.models import OrganizationInvitation
+            from datetime import datetime, timezone
+            
+            pending_invitations_count = OrganizationInvitation.query.filter_by(
+                email=email,
+                is_accepted=False
+            ).filter(
+                OrganizationInvitation.expires_at > datetime.now(timezone.utc)
+            ).count()
+            
+            response_message = "User created successfully as guest"
+            next_steps = "You can now request organizer privileges or wait for organization invitations"
+            
+            if pending_invitations_count > 0:
+                response_message += f" You have {pending_invitations_count} pending invitation(s) waiting"
+                next_steps = "Please login to see your pending invitations in the dashboard"
             
             return jsonify({
-                "message": f"User created successfully and automatically joined {organization.name}",
-                "organization": organization.to_dict(),
-                "role": UserRole.TEAM_MEMBER.value
-            }), 201
+                "message": response_message,
+                "role": UserRole.GUEST.value,
+                "pending_invitations": pending_invitations_count,
+                "next_steps": next_steps
+            }, 201)
             
         else:
-            # Regular registration - handle role assignment securely
-            if requested_role == UserRole.ORGANIZER.value:
-                # Organizer role requires admin approval
-                new_user = User(
-                    email=email,
-                    password=password,
-                    first_name=first_name,
-                    last_name=last_name,
-                    role=UserRole.GUEST.value,  # Start as guest pending approval
-                    organization_id=None,
-                    pending_organizer_approval=True,  # Mark for admin approval
-                )
-                
-                db.session.add(new_user)
-                db.session.commit()
-                
-                # Send approval request to admins
-                try:
-                    notify_admins_organizer_request(new_user)
-                except Exception as e:
-                    print(f"Failed to notify admins: {str(e)}")
-                
-                return jsonify({
-                    "message": "User created successfully. Your organizer role request has been submitted for admin approval. You will receive an email once reviewed.",
-                    "role": UserRole.GUEST.value,
-                    "pending_approval": True,
-                    "approval_status": "Your organizer request is pending admin approval"
-                }), 201
-                
-            elif requested_role == UserRole.TEAM_MEMBER.value:
-                # Team member role is not allowed for direct registration
-                # Users should join organizations through invitations
-                return jsonify({
-                    "error": "Team member role cannot be selected during registration. Please register as a guest and join organizations through invitations or "
-                    "Register as 'guest' and wait for organization invitations"
-                }), 400
-                
-            elif requested_role == UserRole.ADMIN.value:
-                # Admin role is never allowed for self-registration
-                return jsonify({
-                    "error": "Admin role cannot be selected during registration or"
-                    "Please register as 'guest' or request 'organizer' approval"
-                }), 400
-                
-            elif requested_role in [UserRole.GUEST.value, "", None]:
-                # Valid guest registration (default)
-                new_user = User(
-                    email=email,
-                    password=password,
-                    first_name=first_name,
-                    last_name=last_name,
-                    role=UserRole.GUEST.value,
-                    organization_id=None,
-                )
-                
-                db.session.add(new_user)
-                db.session.commit()
-                
-                return jsonify({
-                    "message": "User created successfully as guest",
-                    "role": UserRole.GUEST.value,
-                    "next_steps": "You can now request organizer privileges or wait for organization invitations"
-                }), 201
-                
-            else:
-                # Invalid role specified
-                return jsonify({
-                    "error": f"Invalid role '{requested_role}'. Valid options are: 'guest' or 'organizer'",
-                    "valid_roles": ["guest", "organizer"]
-                }), 400
+            # Invalid role specified
+            return jsonify({
+                "error": f"Invalid role '{requested_role}'. Valid options are: 'guest' or 'organizer'",
+                "valid_roles": ["guest", "organizer"]
+            }), 400
 
     return jsonify({"message": "Register page"})
 
@@ -200,10 +184,52 @@ def login():
         # Validate password
         if not user.check_password(password):
             return jsonify({"message": "Invalid credentials"}), 401
-        # timedelta is a class in Python's datetime module that represents a duration, the difference between two dates or times.
-        # It is commonly used to perform arithmetic with dates and times, such as adding or subtracting time intervals.
-        token = user.generate_token(timedelta(hours=2))  # Example of generating a token
-        return jsonify({"message": "Logged in", "token": token}), 200
+
+        # Generate token
+        token = user.generate_token(timedelta(hours=2))
+        
+        # Check for pending invitations
+        from backend.auth.models import OrganizationInvitation
+        from datetime import datetime, timezone
+        
+        pending_invitations = OrganizationInvitation.query.filter_by(
+            email=email,
+            is_accepted=False
+        ).filter(
+            OrganizationInvitation.expires_at > datetime.now(timezone.utc)
+        ).all()
+        
+        # Prepare invitation info
+        invitation_info = []
+        for invitation in pending_invitations:
+            org = Organization.query.get(invitation.organization_id)
+            if org and not org.is_deleted:
+                invitation_info.append({
+                    "id": invitation.id,
+                    "organization_name": org.name,
+                    "role": invitation.role,
+                    "expires_at": invitation.expires_at.isoformat()
+                })
+        
+        response_data = {
+            "message": "Logged in successfully",
+            "token": token,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role,
+                "organization_id": user.organization_id
+            },
+            "pending_invitations_count": len(invitation_info)
+        }
+        
+        if invitation_info:
+            response_data["pending_invitations"] = invitation_info
+            response_data["message"] += f" You have {len(invitation_info)} pending invitation(s)"
+        
+        return jsonify(response_data), 200
 
     return jsonify({"message": "Login page"})
 
@@ -336,16 +362,32 @@ def create_organization():
         if name.strip() == "":
             return jsonify({"error": "Organization name cannot be empty or just whitespace"}), 400
 
-        # Use the new check_name_exists method
-        if Organization.check_name_exists(name):
-            return jsonify({
-                "error": "An organization with this name already exists"
-            }, 409)
+        # Clean the name
+        clean_name = name.strip()
 
+        # Check if organization name already exists (including soft-deleted ones)
+        existing_org = Organization.query.filter(
+            func.lower(Organization.name) == func.lower(clean_name)
+        ).first()
+
+        if existing_org:
+            if existing_org.is_deleted:
+                return jsonify({
+                    "error": f"Organization name '{clean_name}' was previously used by a deleted organization. Please choose a different name.",
+                    "suggestion": f"Try '{clean_name}_2025' or '{clean_name}_new'"
+                }), 409
+            else:
+                return jsonify({
+                    "error": f"Organization name '{clean_name}' already exists. Please choose a different name.",
+                    "existing_org_id": existing_org.id
+                }), 409
+
+        # Create new organization
         new_organization = Organization(
-            name=name,
-            description=description
+            name=clean_name,
+            description=description.strip() if description else None
         )
+        
         db.session.add(new_organization)
         db.session.flush()  # This assigns an ID without committing
         
@@ -356,12 +398,15 @@ def create_organization():
         return jsonify({
             "message": "Organization created successfully!",
             "organization": new_organization.to_dict()
-        }, 201)
+        }), 201
         
     except Exception as e:
         print("Error in create_organization:", str(e))
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": f"Failed to create organization: {str(e)}",
+            "suggestion": "Try using a different organization name"
+        }), 500
     
 @auth.route("/organizations/<string:filter_type>", methods=["GET"])
 @role_required("admin")
@@ -453,7 +498,7 @@ def invite_user_to_organization(org_id):
         if role not in valid_invite_roles:
             return jsonify({
                 "error": f"Invalid role. Can only invite users as: {', '.join(valid_invite_roles)}"
-            }), 400
+            }, 400)
 
         # Check if organization exists and is active
         organization = Organization.query.get(org_id)
@@ -481,6 +526,11 @@ def invite_user_to_organization(org_id):
 
         # Check for existing pending invitation (for both registered and unregistered)
         from backend.auth.models import OrganizationInvitation
+        from datetime import datetime, timezone
+        
+        # Fix timezone issue - use consistent timezone-aware datetime
+        current_time = datetime.now(timezone.utc)
+        
         existing_invite = OrganizationInvitation.query.filter_by(
             email=email,
             organization_id=org_id,
@@ -488,48 +538,78 @@ def invite_user_to_organization(org_id):
         ).first()
 
         if existing_invite:
-            from datetime import datetime, timezone
-            if existing_invite.expires_at > datetime.now(timezone.utc):
+            # Ensure expires_at is timezone-aware for comparison
+            expires_at = existing_invite.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            
+            if expires_at > current_time:
                 return jsonify({
-                    "error": "An active invitation already exists for this user"
-                }), 409
+                    "error": "An active invitation already exists for this user",
+                    "existing_invitation": {
+                        "expires_at": expires_at.isoformat(),
+                        "role": existing_invite.role
+                    }
+                }, 409)
             else:
                 # Remove expired invitation
                 db.session.delete(existing_invite)
 
         # Create new invitation (works for both registered and unregistered users)
-        from datetime import datetime, timezone, timedelta
+        from datetime import timedelta
         new_invitation = OrganizationInvitation(
             email=email,
             role=role,
             organization_id=org_id,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=7)
+            expires_at=current_time + timedelta(days=7)
         )
         
         db.session.add(new_invitation)
         db.session.commit()
 
         # Send different emails based on registration status
+        email_sent = False
+        email_error = None
+        
+        
         try:
             if invited_user:
                 send_invitation_email(invited_user, organization, inviter, role)
+                email_sent = True
             else:
                 send_registration_invitation_email(email, organization, inviter, role)
+                email_sent = True
         except Exception as e:
-            print(f"Failed to send invitation email: {str(e)}")
+            email_error = str(e)
+            import traceback
+        
 
-        message = "Invitation sent successfully"
+        message = "Invitation created successfully"
+        if email_sent:
+            message += " and email sent"
+        else:
+            message += f" but email failed to send"
+            
         if not invited_user:
             message += ". The user will need to register first to accept the invitation."
 
         return jsonify({
             "message": message,
+            "email_sent": email_sent,
+            "email_error": email_error,
             "invitation": {
+                "id": new_invitation.id,
                 "email": email,
                 "role": role,
                 "organization": organization.name,
                 "expires_at": new_invitation.expires_at.isoformat(),
                 "user_registered": invited_user is not None
+            },
+            "debug_info": {
+                "mail_server": os.environ.get('MAIL_SERVER'),
+                "verified_email": os.environ.get('VERIFIED_EMAIL'),
+                "user_type": "registered" if invited_user else "unregistered",
+                "email_function_called": "send_invitation_email" if invited_user else "send_registration_invitation_email"
             }
         }), 201
 
@@ -544,63 +624,90 @@ def invite_user_to_organization(org_id):
 
 def send_invitation_email(user, organization, inviter, role):
     """
-    Helper function to send invitation email
+    Helper function to send invitation email to registered users
     """
-    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-    invitation_url = f"{frontend_url}/accept-invitation"
+    
+    try:
+        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+        login_url = f"{frontend_url}/login"
+        
 
-    msg = Message(
-        f"Invitation to join {organization.name}",
-        sender=os.environ.get("VERIFIED_EMAIL"),
-        recipients=[user.email],
-    )
-    
-    msg.html = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #333; text-align: center;">Organization Invitation</h2>
-            <p style="color: #666; font-size: 16px;">Hello {user.first_name},</p>
-            <p style="color: #666; font-size: 16px;">
-                {inviter.first_name} {inviter.last_name} has invited you to join 
-                <strong>{organization.name}</strong> as a <strong>{role}</strong>.
-            </p>
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{invitation_url}" 
-                   style="background-color: #28a745; 
-                          color: white; 
-                          padding: 12px 25px; 
-                          text-decoration: none; 
-                          border-radius: 4px; 
-                          display: inline-block;">
-                    Accept Invitation
-                </a>
+        msg = Message(
+            f"Invitation to join {organization.name}",
+            sender=os.environ.get("VERIFIED_EMAIL"),
+            recipients=[user.email],
+        )
+        
+        
+        msg.html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #333; text-align: center;">Organization Invitation</h2>
+                <p style="color: #666; font-size: 16px;">Hello {user.first_name},</p>
+                <p style="color: #666; font-size: 16px;">
+                    {inviter.first_name} {inviter.last_name} has invited you to join 
+                    <strong>{organization.name}</strong> as a <strong>{role}</strong>.
+                </p>
+                <div style="background: #e8f4fd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #007bff;">
+                    <p style="margin: 5px 0; color: #004085;"><strong>Organization:</strong> {organization.name}</p>
+                    <p style="margin: 5px 0; color: #004085;"><strong>Role:</strong> {role}</p>
+                    <p style="margin: 5px 0; color: #004085;"><strong>Invited by:</strong> {inviter.first_name} {inviter.last_name}</p>
+                </div>
+                <p style="color: #666; font-size: 16px;">
+                    <strong>To accept this invitation:</strong>
+                </p>
+                <ol style="color: #666; font-size: 16px;">
+                    <li>Login to your account using the button below</li>
+                    <li>Check your dashboard for pending invitations</li>
+                    <li>Accept the invitation to join the organization</li>
+                </ol>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{login_url}" 
+                       style="background-color: #007bff; 
+                              color: white; 
+                              padding: 12px 25px; 
+                              text-decoration: none; 
+                              border-radius: 4px; 
+                              display: inline-block;">
+                        Login to Accept Invitation
+                    </a>
+                </div>
+                <p style="color: #666; font-size: 14px;">This invitation will expire in 7 days.</p>
+                <p style="color: #666; font-size: 14px;">
+                    Organization Description: {organization.description or "No description provided"}
+                </p>
+                <hr style="border: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px; text-align: center;">
+                    This email was sent by Event Planner. Please do not reply to this email.
+                </p>
             </div>
-            <p style="color: #666; font-size: 14px;">This invitation will expire in 7 days.</p>
-            <p style="color: #666; font-size: 14px;">
-                Organization Description: {organization.description or "No description provided"}
-            </p>
-            <hr style="border: 1px solid #eee; margin: 20px 0;">
-            <p style="color: #999; font-size: 12px; text-align: center;">
-                This email was sent by Event Planner. Please do not reply to this email.
-            </p>
-        </div>
-    """
-    
-    mail.send(msg)
+        """
+        
+        
+        mail.send(msg)
+        
+        
+    except Exception as e:
+        import traceback
+        raise e
+
 
 def send_registration_invitation_email(email, organization, inviter, role):
     """
     Send invitation email to unregistered users
     """
-    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-    registration_url = f"{frontend_url}/register?invitation_email={email}&org_id={organization.id}"
-
-    msg = Message(
-        f"You're invited to join {organization.name}",
-        sender=os.environ.get("VERIFIED_EMAIL"),
-        recipients=[email],
-    )
     
-    msg.html = f"""
+    try:
+        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+        registration_url = f"{frontend_url}/register"
+        
+        msg = Message(
+            f"You're invited to join {organization.name}",
+            sender=os.environ.get("VERIFIED_EMAIL"),
+            recipients=[email],
+        )
+        
+        
+        msg.html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #333; text-align: center;">You're Invited!</h2>
             <p style="color: #666; font-size: 16px;">Hello,</p>
@@ -632,8 +739,11 @@ def send_registration_invitation_email(email, organization, inviter, role):
             </p>
         </div>
     """
-    
-    mail.send(msg)
+        
+        mail.send(msg)
+        
+    except Exception as e:
+        raise e
 
 @auth.route("/accept-invitation", methods=["POST"])
 @jwt_required()
@@ -1506,38 +1616,8 @@ def notify_user_organizer_approval(user, approved, admin_name):
         
         mail.send(msg)
         
-    except Exception as e:
-        print(f"Failed to notify user about organizer {status}: {str(e)}")
-
-
-# Admin endpoints for organizer approval management
-@auth.route("/admin/organizer-requests", methods=["GET"])
-@role_required("admin")
-def get_pending_organizer_requests():
-    """Get all pending organizer role requests"""
-    try:
-        pending_users = User.query.filter_by(
-            pending_organizer_approval=True,
-            role=UserRole.GUEST.value
-        ).order_by(User.created_at.desc()).all()
-        
-        requests = []
-        for user in pending_users:
-            requests.append({
-                'id': user.id,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'email': user.email,
-                'created_at': user.created_at.isoformat() if user.created_at else None,
-                'current_role': user.role,
-                'pending_approval': user.pending_organizer_approval
-            })
-        
-        return jsonify({
-            'message': f'Found {len(requests)} pending organizer requests',
-            'pending_requests': requests,
-            'total_count': len(requests)
-        }), 200
+        print(f"✅ mail.send() completed successfully for: {user.email}")
+        print(f"=== notify_user_organizer_approval FUNCTION END ===")
         
     except Exception as e:
         return jsonify({'error': f'Failed to retrieve organizer requests: {str(e)}'}), 500
