@@ -1040,7 +1040,7 @@ def get_organization(org_id):
         }), 500
 
 @auth.route("/organization/leave", methods=["POST"])
-@jwt_required("organizer")
+@role_required("organizer")
 def leave_organization():
     """
     Allow a user to leave their current organization.
@@ -1248,6 +1248,7 @@ def change_member_role(org_id, member_id):
     """
     Change a member's role within an organization.
     Only organizers can change member roles.
+    If role is changed to guest, the user is removed from the organization.
     """
     try:
         # Get the current user from JWT token
@@ -1317,16 +1318,27 @@ def change_member_role(org_id, member_id):
         # Update the member's role
         member.role = new_role
         
+        # If the new role is guest, remove them from the organization
+        if new_role == UserRole.GUEST.value:
+            member.organization_id = None
+            message = f"{member_name} has been changed to guest role and removed from {organization.name}"
+            action = "removed_from_organization"
+        else:
+            message = f"{member_name}'s role has been changed from {old_role} to {new_role}"
+            action = "role_changed"
+        
         db.session.commit()
         
         return jsonify({
-            "message": f"{member_name}'s role has been changed from {old_role} to {new_role}",
+            "message": message,
+            "action": action,
             "member": {
                 "id": member.id,
                 "name": member_name,
                 "email": member.email,
                 "old_role": old_role,
-                "new_role": new_role
+                "new_role": new_role,
+                "organization_id": member.organization_id  # Will be None if removed
             }
         }), 200
         
