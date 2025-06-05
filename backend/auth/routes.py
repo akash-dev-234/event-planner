@@ -776,7 +776,14 @@ def accept_invitation():
             return jsonify({"error": "Invitation not found or already accepted"}), 404
 
         from datetime import datetime, timezone
-        if invitation.expires_at < datetime.now(timezone.utc):
+        current_time = datetime.now(timezone.utc)
+        
+        # Fix timezone issue - ensure both datetimes are timezone-aware
+        expires_at = invitation.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
+        if expires_at < current_time:
             return jsonify({"error": "Invitation has expired"}), 400
 
         if user.organization_id is not None:
