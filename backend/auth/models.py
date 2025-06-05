@@ -207,6 +207,11 @@ class Event(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id"), nullable=False
     )  # Required for events
+    
+    # Add timestamp fields for tracking
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    deleted_at = db.Column(db.DateTime, nullable=True)  # For soft delete
 
     def __init__(
         self,
@@ -227,6 +232,54 @@ class Event(db.Model):
         self.time = time
         self.organization_id = organization_id  # Set the organization ID
         self.user_id = user_id  # Set the user ID (organizer)
+    
+    @property
+    def is_deleted(self):
+        """Check if event is soft deleted"""
+        return self.deleted_at is not None
+    
+    def soft_delete(self):
+        """Soft delete the event"""
+        self.deleted_at = datetime.now(timezone.utc)
+    
+    @classmethod
+    def get_active(cls):
+        """Get all active (non-deleted) events"""
+        return cls.query.filter(cls.deleted_at.is_(None))
+    
+    @classmethod
+    def get_public_events(cls):
+        """Get all public active events"""
+        return cls.get_active().filter(cls.is_public == True)
+    
+    @classmethod
+    def get_organization_events(cls, org_id):
+        """Get all active events for a specific organization"""
+        return cls.get_active().filter(cls.organization_id == org_id)
+    
+    def to_dict(self, include_private=False):
+        """Convert event to dictionary"""
+        data = {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'date': self.date.isoformat() if self.date else None,
+            'time': self.time.isoformat() if self.time else None,
+            'location': self.location,
+            'is_public': self.is_public,
+            'organization_id': self.organization_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+        
+        if include_private:
+            data.update({
+                'user_id': self.user_id,
+                'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
+                'is_deleted': self.is_deleted
+            })
+        
+        return data
 
 
 class OrganizationInvitation(db.Model):

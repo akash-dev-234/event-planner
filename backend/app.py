@@ -2,6 +2,7 @@ import os
 from flask import Flask, jsonify, request
 from backend.extensions import db, bcrypt, jwt, migrate, mail
 from backend.auth import auth
+from backend.events import events
 from dotenv import load_dotenv
 
 
@@ -49,6 +50,7 @@ def create_app():
 
     # Register blueprints
     app.register_blueprint(auth)
+    app.register_blueprint(events, url_prefix='/events')
 
     @app.route("/")
     def home():

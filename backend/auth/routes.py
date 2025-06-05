@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 import os
 import re
-import traceback
 from flask_jwt_extended import get_jwt, jwt_required
 from flask_mail import Message
 from backend.auth.decorators import admin_or_organizer_required, role_required
