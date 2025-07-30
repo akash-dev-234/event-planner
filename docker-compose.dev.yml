@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - GROK_API_KEY=${GROK_API_KEY}
+      - MAIL_SERVER=${MAIL_SERVER}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USE_TLS=${MAIL_USE_TLS}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+    volumes:
+      - ./apps/backend:/app
+      - backend_data:/app/instance
+    command: python app.py
+    networks:
+      - event-planner-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./apps/frontend/Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:5001
+    volumes:
+      - .:/workspace
+      - /workspace/node_modules
+    command: npm run frontend:serve
+    depends_on:
+      - backend
+    networks:
+      - event-planner-network
+
+volumes:
+  backend_data:
+
+networks:
+  event-planner-network:
+    driver: bridge

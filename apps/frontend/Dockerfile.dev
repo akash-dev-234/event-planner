@@ -1,0 +1,19 @@
+FROM node:18-alpine
+
+WORKDIR /workspace
+
+# Copy package files from root
+COPY package*.json ./
+COPY nx.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy entire workspace
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start development server for frontend app
+CMD ["npm", "run", "frontend:serve", "--", "--host", "0.0.0.0"]
