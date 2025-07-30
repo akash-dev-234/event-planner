@@ -1,0 +1,57 @@
+
+.nx/installation
+.nx/cache
+.nx/workspace-data
+.nx/
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+*/dist/
+build/
+*/build/
+.next/
+*/.next/
+
+# Environment files
+# .env
+*.env
+.env.local
+.env.production
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# Logs
+*.log
+logs/
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md

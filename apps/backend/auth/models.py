@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 import os
-from backend.extensions import db, bcrypt
+from extensions import db, bcrypt
 from flask_jwt_extended import create_access_token
 from itsdangerous import URLSafeTimedSerializer
 from sqlalchemy import func

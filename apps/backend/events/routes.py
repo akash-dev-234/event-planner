@@ -2,9 +2,9 @@ import os
 from datetime import datetime, date, time
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
-from backend.auth.decorators import admin_or_organizer_required, role_required
-from backend.auth.models import Event, Organization, User, UserRole
-from backend.extensions import db
+from auth.decorators import admin_or_organizer_required, role_required
+from auth.models import Event, Organization, User, UserRole
+from extensions import db
 from . import events
 
 

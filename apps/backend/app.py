@@ -1,8 +1,9 @@
 import os
 from flask import Flask, jsonify, request
-from backend.extensions import db, bcrypt, jwt, migrate, mail
-from backend.auth import auth
-from backend.events import events
+from extensions import db, bcrypt, jwt, migrate, mail
+from auth import auth
+from events import events
+from chat.routes import chat_bp
 from dotenv import load_dotenv
 
 
@@ -51,6 +52,7 @@ def create_app():
     # Register blueprints
     app.register_blueprint(auth)
     app.register_blueprint(events, url_prefix='/events')
+    app.register_blueprint(chat_bp)
 
     @app.route("/")
     def home():
@@ -63,4 +65,4 @@ if __name__ == "__main__":
     app = create_app()
     with app.app_context():
         db.create_all()  # Create database tables
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

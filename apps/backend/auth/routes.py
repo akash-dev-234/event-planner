@@ -3,11 +3,11 @@ import os
 import re
 from flask_jwt_extended import get_jwt, jwt_required
 from flask_mail import Message
-from backend.auth.decorators import admin_or_organizer_required, role_required
+from auth.decorators import admin_or_organizer_required, role_required
 from . import auth
 from flask import request, jsonify
-from backend.auth.models import Organization, User, UserRole
-from backend.extensions import db, mail, bcrypt
+from auth.models import Organization, User, UserRole
+from extensions import db, mail, bcrypt
 from sqlalchemy import func
 
 # re is a built-in Python module that provides support for working with regular expressions (regex).
@@ -131,7 +131,7 @@ def register():
             db.session.commit()
             
             # Check if user has any pending invitations
-            from backend.auth.models import OrganizationInvitation
+            from auth.models import OrganizationInvitation
             from datetime import datetime, timezone
             
             pending_invitations_count = OrganizationInvitation.query.filter_by(
@@ -188,7 +188,7 @@ def login():
         token = user.generate_token(timedelta(hours=2))
         
         # Check for pending invitations
-        from backend.auth.models import OrganizationInvitation
+        from auth.models import OrganizationInvitation
         from datetime import datetime, timezone
         
         pending_invitations = OrganizationInvitation.query.filter_by(
@@ -524,7 +524,7 @@ def invite_user_to_organization(org_id):
                 return jsonify({"error": "Cannot invite admin users to organizations"}), 400
 
         # Check for existing pending invitation (for both registered and unregistered)
-        from backend.auth.models import OrganizationInvitation
+        from auth.models import OrganizationInvitation
         from datetime import datetime, timezone
         
         # Fix timezone issue - use consistent timezone-aware datetime
@@ -764,7 +764,7 @@ def accept_invitation():
         if not invitation_id:
             return jsonify({"error": "Invitation ID is required"}), 400
 
-        from backend.auth.models import OrganizationInvitation
+        from auth.models import OrganizationInvitation
         invitation = OrganizationInvitation.query.filter_by(
             id=invitation_id,
             email=user.email,
@@ -957,7 +957,7 @@ def delete_organization(org_id):
         organization.soft_delete()
         
         # Cancel any pending invitations for this organization
-        from backend.auth.models import OrganizationInvitation
+        from auth.models import OrganizationInvitation
         pending_invitations = OrganizationInvitation.query.filter_by(
             organization_id=org_id,
             is_accepted=False
@@ -1378,7 +1378,7 @@ def get_organization_invitations(org_id):
             return jsonify({"error": "Organization not found"}), 404
 
         # Get pending invitations
-        from backend.auth.models import OrganizationInvitation
+        from auth.models import OrganizationInvitation
         from datetime import datetime, timezone
         
         pending_invitations = OrganizationInvitation.query.filter_by(
@@ -1427,7 +1427,7 @@ def get_my_invitations():
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        from backend.auth.models import OrganizationInvitation
+        from auth.models import OrganizationInvitation
         from datetime import datetime, timezone
         
         pending_invitations = OrganizationInvitation.query.filter_by(
