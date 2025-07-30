@@ -3,9 +3,10 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 import requests
 import re
 import os
-from auth.decorators import organization_member_required
+from decorators import organization_member_required
 
-chat_bp = Blueprint('chat', __name__, url_prefix='/api/chat')
+from . import chat_bp
+from utils.validators import sanitize_input
 
 GROQ_API_KEY = os.environ.get('GROK_API_KEY')  # Using same env var name
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -27,30 +28,6 @@ You cannot and will not:
 Keep responses focused on event planning functionality only.
 """
 
-def sanitize_input(text):
-    """Sanitize user input to prevent injection attacks"""
-    if not text or not isinstance(text, str):
-        return ""
-    
-    # Remove potential sensitive patterns
-    sensitive_patterns = [
-        r'api[_-]?key',
-        r'password',
-        r'secret',
-        r'token',
-        r'auth',
-        r'<script',
-        r'javascript:',
-        r'eval\(',
-        r'exec\(',
-    ]
-    
-    sanitized = text
-    for pattern in sensitive_patterns:
-        sanitized = re.sub(pattern, '[REDACTED]', sanitized, flags=re.IGNORECASE)
-    
-    # Limit length
-    return sanitized[:1000]
 
 def filter_response(response_text):
     """Filter response to ensure no sensitive information leaks"""

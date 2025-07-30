@@ -1,9 +1,15 @@
 import os
+import sys
+
+# Add the current directory to Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from flask import Flask, jsonify, request
 from extensions import db, bcrypt, jwt, migrate, mail
-from auth import auth
-from events import events
-from chat.routes import chat_bp
+from routes.auth import auth_bp
+from routes.events import events_bp
+from routes.chat import chat_bp
+from routes.organizations import organization_bp
 from dotenv import load_dotenv
 
 
@@ -50,9 +56,10 @@ def create_app():
    
 
     # Register blueprints
-    app.register_blueprint(auth)
-    app.register_blueprint(events, url_prefix='/events')
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(events_bp)
     app.register_blueprint(chat_bp)
+    app.register_blueprint(organization_bp)
 
     @app.route("/")
     def home():
