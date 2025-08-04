@@ -12,6 +12,8 @@ export const makeStore = () => {
       organization: organizationReducer,
       events: eventsReducer,
     },
+    // Enable Redux DevTools and disable HMR state reset in development
+    devTools: process.env.NODE_ENV !== 'production',
   });
 };
 

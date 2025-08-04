@@ -7,11 +7,9 @@ import {
   forgotPassword as forgotPasswordThunk, 
   resetPassword as resetPasswordThunk,
   logout,
-  clearError,
-  initializeAuth
+  clearError
 } from '@/lib/redux/features/authSlice';
 import { LoginRequest, RegisterRequest } from '@/lib/api';
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export function useReduxAuth() {
@@ -19,10 +17,7 @@ export function useReduxAuth() {
   const router = useRouter();
   const { user, token, isLoading, error, isAuthenticated } = useAppSelector((state) => state.auth);
 
-  useEffect(() => {
-    // Initialize auth on app load
-    dispatch(initializeAuth());
-  }, [dispatch]);
+  // Auth initialization is now handled at the app level in AuthInitializer
 
   const login = async (credentials: LoginRequest) => {
     const result = await dispatch(loginUser(credentials));

@@ -26,11 +26,21 @@ export default function RouteGuard({
   const pathname = usePathname();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  // Track when auth has been properly initialized
+  useEffect(() => {
+    if (!isLoading && !hasInitialized) {
+      setHasInitialized(true);
+    }
+  }, [isLoading, hasInitialized]);
 
   useEffect(() => {
     const checkAuth = async () => {
-      // Wait for auth to initialize
-      if (isLoading) return;
+      // Wait for auth to initialize completely
+      if (isLoading || !hasInitialized) {
+        return;
+      }
 
       // Check authentication
       if (requireAuth && !isAuthenticated) {
@@ -66,10 +76,10 @@ export default function RouteGuard({
     };
 
     checkAuth();
-  }, [isAuthenticated, user, isLoading, requireAuth, requireRole, requireOrganization, router, redirectTo, pathname, allowedRoles]);
+  }, [isAuthenticated, user, isLoading, requireAuth, requireRole, requireOrganization, router, redirectTo, pathname, allowedRoles, hasInitialized]);
 
   // Show loading while checking auth
-  if (isLoading || isChecking || (requireAuth && !isAuthorized)) {
+  if (isLoading || !hasInitialized || isChecking || (requireAuth && !isAuthorized)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">

@@ -16,7 +16,8 @@ import {
   Shield,
   Plus,
   Eye,
-  LogOut
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -95,9 +96,22 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     },
     {
       name: 'Admin Panel',
-      href: '/admin',
       icon: Shield,
       show: user?.role === 'admin',
+      submenu: [
+        {
+          name: 'Overview',
+          href: '/admin',
+          icon: Shield,
+          show: user?.role === 'admin',
+        },
+        {
+          name: 'Pending Requests',
+          href: '/admin/organizer-requests',
+          icon: UserCheck,
+          show: user?.role === 'admin',
+        },
+      ],
     },
   ];
 

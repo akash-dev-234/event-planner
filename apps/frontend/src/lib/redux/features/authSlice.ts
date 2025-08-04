@@ -100,6 +100,7 @@ export const initializeAuth = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = apiClient.getToken();
+      
       if (!token) {
         return null;
       }
@@ -224,16 +225,23 @@ const authSlice = createSlice({
         state.error = action.payload as string;
       })
       // Initialize Auth
+      .addCase(initializeAuth.pending, (state) => {
+        state.isLoading = true;
+      })
       .addCase(initializeAuth.fulfilled, (state, action) => {
+        state.isLoading = false;
         if (action.payload?.token) {
           state.token = action.payload.token;
           state.isAuthenticated = true;
+          // Make sure apiClient also has the token
+          apiClient.setToken(action.payload.token);
           if (action.payload.user) {
             state.user = action.payload.user;
           }
         }
       })
       .addCase(initializeAuth.rejected, (state) => {
+        state.isLoading = false;
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;

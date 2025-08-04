@@ -377,6 +377,30 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Admin endpoints
+  async getOrganizerRequests(): Promise<ApiResponse & { requests: Array<{
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    created_at: string;
+    role: string;
+  }> }> {
+    return this.request('/api/auth/admin/organizer-requests');
+  }
+
+  async approveOrganizerRequest(userId: number): Promise<ApiResponse> {
+    return this.request(`/api/auth/admin/organizer-requests/${userId}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  async rejectOrganizerRequest(userId: number): Promise<ApiResponse> {
+    return this.request(`/api/auth/admin/organizer-requests/${userId}/reject`, {
+      method: 'POST',
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
