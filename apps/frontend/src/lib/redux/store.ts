@@ -1,8 +1,17 @@
 import { configureStore } from "@reduxjs/toolkit";
+import authReducer from "./features/authSlice";
+import toastReducer from "./features/toastSlice";
+import organizationReducer from "./features/organizationSlice";
+import eventsReducer from "./features/eventsSlice";
 
 export const makeStore = () => {
   return configureStore({
-    reducer: {},
+    reducer: {
+      auth: authReducer,
+      toast: toastReducer,
+      organization: organizationReducer,
+      events: eventsReducer,
+    },
   });
 };
 
