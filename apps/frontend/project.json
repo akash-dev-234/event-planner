@@ -14,7 +14,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "next dev --turbopack",
+        "command": "next dev --turbopack --hostname 0.0.0.0",
         "cwd": "apps/frontend"
       }
     },

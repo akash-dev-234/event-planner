@@ -17,6 +17,8 @@ services:
       - MAIL_USE_TLS=${MAIL_USE_TLS}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAIL_USERNAME=${MAIL_USERNAME}
+      - VERIFIED_EMAIL=${VERIFIED_EMAIL}
+      - FRONTEND_URL=${FRONTEND_URL}
     volumes:
       - ./apps/backend:/app
       - backend_data:/app/instance
@@ -25,13 +27,16 @@ services:
 
   frontend:
     build:
-      context: ./apps/frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./apps/frontend/Dockerfile.dev
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://backend:5001
+      - NEXT_PUBLIC_API_URL=http://localhost:5001
+    volumes:
+      - .:/workspace
+      - /workspace/node_modules
     depends_on:
       - backend
     networks:

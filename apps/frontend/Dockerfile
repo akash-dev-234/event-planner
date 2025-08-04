@@ -5,9 +5,9 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files
+# Copy package files from root (Nx monorepo)
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -15,8 +15,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the application
-RUN npm run build
+# Install Nx globally and build the frontend
+RUN npm install -g nx
+RUN nx build frontend
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -27,10 +28,9 @@ ENV NODE_ENV production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy built application
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy built application from Nx build output
+COPY --from=builder /app/dist/apps/frontend ./
+COPY --from=builder --chown=nextjs:nodejs /app/dist/apps/frontend/.next/static ./.next/static
 
 USER nextjs
 

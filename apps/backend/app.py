@@ -5,6 +5,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from extensions import db, bcrypt, jwt, migrate, mail
 from routes.auth import auth_bp
 from routes.events import events_bp
@@ -20,6 +21,10 @@ def create_app():
     # Add these lines for better debugging
     app.config['DEBUG'] = True
     app.config['PROPAGATE_EXCEPTIONS'] = True
+    
+    # Enable CORS for all routes
+    CORS(app, origins=['http://localhost:3000', 'http://frontend:3000'], 
+         supports_credentials=True)
 
     app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
     app.config['JWT_TOKEN_LOCATION'] = ['headers']
@@ -72,4 +77,4 @@ if __name__ == "__main__":
     app = create_app()
     with app.app_context():
         db.create_all()  # Create database tables
-    app.run(debug=True, port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5001)
