@@ -272,10 +272,6 @@ class ApiClient {
   }
 
   // User endpoints
-  async getCurrentUser(): Promise<User> {
-    // This would need to be implemented on the backend
-    return this.request('/api/auth/user/me');
-  }
 
   async getMyInvitations(): Promise<ApiResponse> {
     return this.request('/api/auth/my-invitations');

@@ -1,6 +1,19 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { apiClient, User, LoginRequest, RegisterRequest, ApiError } from '@/lib/api';
 
+// Helper function to get cookie value
+function getCookieValue(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const [cookieName, cookieValue] = cookie.trim().split('=');
+    if (cookieName === name) {
+      return cookieValue;
+    }
+  }
+  return null;
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -91,18 +104,24 @@ export const initializeAuth = createAsyncThunk(
         return null;
       }
       
-      // Try to get current user data to validate token
-      try {
-        const user = await apiClient.getCurrentUser();
-        return { token, user };
-      } catch {
-        // Token is invalid, clear it
-        apiClient.clearToken();
-        return rejectWithValue('Token validation failed');
+      // Try to reconstruct user data from cookies
+      let user = null;
+      if (typeof document !== 'undefined') {
+        const userDataCookie = getCookieValue('userData');
+        
+        if (userDataCookie) {
+          try {
+            user = JSON.parse(decodeURIComponent(userDataCookie));
+          } catch {
+            // If userData cookie is invalid, user will need to log in again
+          }
+        }
       }
+      
+      return { token, user };
     } catch {
       apiClient.clearToken();
-      return rejectWithValue('Token validation failed');
+      return rejectWithValue('Token initialization failed');
     }
   }
 );
@@ -117,8 +136,9 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.error = null;
       apiClient.clearToken();
-      // Clear cookies for middleware
-      if (typeof document !== 'undefined') {
+      // Clear all cookies
+      if (typeof window !== 'undefined') {
+        document.cookie = 'userData=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
         document.cookie = 'userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
         document.cookie = 'organizationId=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
       }
@@ -144,8 +164,13 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         state.isAuthenticated = true;
         state.error = null;
-        // Set cookies for middleware
-        if (typeof document !== 'undefined') {
+        // Set cookies for middleware and store complete user data
+        if (typeof window !== 'undefined') {
+          // Store complete user data in cookie for initialization
+          const userData = encodeURIComponent(JSON.stringify(action.payload.user));
+          document.cookie = `userData=${userData}; path=/; max-age=86400; SameSite=Lax`;
+          
+          // Set cookies for middleware
           document.cookie = `userRole=${action.payload.user.role}; path=/; max-age=86400; SameSite=Lax`;
           if (action.payload.user.organization_id) {
             document.cookie = `organizationId=${action.payload.user.organization_id}; path=/; max-age=86400; SameSite=Lax`;
