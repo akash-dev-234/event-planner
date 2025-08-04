@@ -91,9 +91,15 @@ export const initializeAuth = createAsyncThunk(
         return null;
       }
       
-      // In a real app, you'd validate the token with the backend
-      // For now, we'll just set the token
-      return { token };
+      // Try to get current user data to validate token
+      try {
+        const user = await apiClient.getCurrentUser();
+        return { token, user };
+      } catch {
+        // Token is invalid, clear it
+        apiClient.clearToken();
+        return rejectWithValue('Token validation failed');
+      }
     } catch {
       apiClient.clearToken();
       return rejectWithValue('Token validation failed');
@@ -111,6 +117,11 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.error = null;
       apiClient.clearToken();
+      // Clear cookies for middleware
+      if (typeof document !== 'undefined') {
+        document.cookie = 'userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+        document.cookie = 'organizationId=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+      }
     },
     clearError: (state) => {
       state.error = null;
@@ -133,6 +144,15 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         state.isAuthenticated = true;
         state.error = null;
+        // Set cookies for middleware
+        if (typeof document !== 'undefined') {
+          document.cookie = `userRole=${action.payload.user.role}; path=/; max-age=86400; SameSite=Lax`;
+          if (action.payload.user.organization_id) {
+            document.cookie = `organizationId=${action.payload.user.organization_id}; path=/; max-age=86400; SameSite=Lax`;
+          } else {
+            document.cookie = 'organizationId=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+          }
+        }
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -182,8 +202,16 @@ const authSlice = createSlice({
       .addCase(initializeAuth.fulfilled, (state, action) => {
         if (action.payload?.token) {
           state.token = action.payload.token;
-          // Note: In a real app, you'd get user data from the token or make an API call
+          state.isAuthenticated = true;
+          if (action.payload.user) {
+            state.user = action.payload.user;
+          }
         }
+      })
+      .addCase(initializeAuth.rejected, (state) => {
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
       });
   },
 });

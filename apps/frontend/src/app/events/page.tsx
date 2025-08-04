@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +25,7 @@ export default function EventsPage() {
   };
 
   return (
-    <DashboardLayout>
+      <DashboardLayout requireAuth={true}>
       <div className="p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -221,7 +221,7 @@ export default function EventsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
   );
 }

@@ -3,36 +3,13 @@
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { Shield, Users, Calendar, Building2, Settings, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 
 export default function AdminPage() {
-  const { user, isAuthenticated } = useReduxAuth();
-  const router = useRouter();
-
-  // Redirect if not authenticated or not an admin
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
-    if (user?.role !== 'admin') {
-      router.push('/dashboard');
-      return;
-    }
-  }, [isAuthenticated, user, router]);
-
-  // Show loading or return null while redirecting
-  if (!isAuthenticated || user?.role !== 'admin') {
-    return null;
-  }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout requireAuth={true} requireRole="admin">
       <div className="p-6">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
@@ -246,7 +223,7 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
   );
 }

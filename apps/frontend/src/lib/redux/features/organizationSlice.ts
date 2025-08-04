@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiClient, Organization, OrganizationMember, CreateOrganizationRequest, InviteUserRequest, Invitation, ApiError } from '@/lib/api';
 
 interface OrganizationState {
@@ -236,7 +236,7 @@ const organizationSlice = createSlice({
       })
       .addCase(fetchMyInvitations.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.myInvitations = action.payload;
+        state.myInvitations = (action.payload as { invitations?: Invitation[] })?.invitations || [];
         state.error = null;
       })
       .addCase(fetchMyInvitations.rejected, (state, action) => {
@@ -269,7 +269,7 @@ const organizationSlice = createSlice({
       .addCase(changeMemberRole.fulfilled, (state, action) => {
         const member = state.members.find(m => m.id === action.payload.memberId);
         if (member) {
-          member.role = action.payload.role as any;
+          member.role = action.payload.role as 'guest' | 'team_member' | 'organizer' | 'admin';
         }
       })
       // Leave Organization

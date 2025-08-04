@@ -11,8 +11,8 @@ export default function DashboardPage() {
   const { user } = useReduxAuth();
 
   return (
-    <DashboardLayout>
-      <div className="p-6">
+    <DashboardLayout requireAuth={true}>
+        <div className="p-6">
         <div className="mb-8">
           <h2 className="text-3xl font-bold mb-2">Dashboard</h2>
           <p className="text-muted-foreground">
@@ -151,7 +151,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
   );
 }

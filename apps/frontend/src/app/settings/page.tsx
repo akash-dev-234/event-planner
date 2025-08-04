@@ -6,13 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
-import { Settings, User, Bell, Shield, Trash2 } from 'lucide-react';
+import { User, Bell, Shield, Trash2 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user } = useReduxAuth();
 
   return (
-    <DashboardLayout>
+      <DashboardLayout requireAuth={true}>
       <div className="p-6">
         <div className="mb-8">
           <h2 className="text-3xl font-bold mb-2">Settings</h2>
@@ -186,7 +186,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
   );
 }

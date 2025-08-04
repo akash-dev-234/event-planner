@@ -139,9 +139,33 @@ class ApiClient {
   constructor() {
     this.baseURL = API_BASE_URL;
     
-    // Initialize token from localStorage if available
+    // Initialize token from cookies if available
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
+      this.token = this.getTokenFromCookies();
+    }
+  }
+
+  private getTokenFromCookies(): string | null {
+    if (typeof document === 'undefined') return null;
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'token') {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  private setCookie(name: string, value: string, maxAge: number = 86400) {
+    if (typeof document !== 'undefined') {
+      document.cookie = `${name}=${value}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    }
+  }
+
+  private deleteCookie(name: string) {
+    if (typeof document !== 'undefined') {
+      document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT`;
     }
   }
 
@@ -193,12 +217,10 @@ class ApiClient {
 
   public setToken(token: string | null) {
     this.token = token;
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('auth_token', token);
-      } else {
-        localStorage.removeItem('auth_token');
-      }
+    if (token) {
+      this.setCookie('token', token);
+    } else {
+      this.deleteCookie('token');
     }
   }
 

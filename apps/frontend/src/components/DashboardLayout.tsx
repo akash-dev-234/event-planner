@@ -5,28 +5,34 @@ import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { Button } from '@/components/ui/button';
 import { LogOut, Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
+import RouteGuard from './RouteGuard';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  requireAuth?: boolean;
+  requireRole?: 'admin' | 'organizer' | 'team_member' | 'guest';
+  requireOrganization?: boolean;
+  allowedRoles?: ('admin' | 'organizer' | 'team_member' | 'guest')[];
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout({ 
+  children, 
+  requireAuth = true,
+  requireRole,
+  requireOrganization = false,
+  allowedRoles = []
+}: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { logout, isAuthenticated } = useReduxAuth();
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Please sign in</h1>
-          <p className="text-muted-foreground">You need to be logged in to access this page.</p>
-        </div>
-      </div>
-    );
-  }
+  const { logout } = useReduxAuth();
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <RouteGuard 
+      requireAuth={requireAuth}
+      requireRole={requireRole}
+      requireOrganization={requireOrganization}
+      allowedRoles={allowedRoles}
+    >
+      <div className="flex min-h-screen bg-background">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
@@ -69,7 +75,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <main className="flex-1">
           {children}
         </main>
+        </div>
       </div>
-    </div>
+    </RouteGuard>
   );
 }

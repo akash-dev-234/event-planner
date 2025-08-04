@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,8 @@ export default function LoginForm() {
   const { login, isLoading: authLoading } = useReduxAuth();
   const { error: errorToast, success } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get('redirect') || '/dashboard';
 
   const {
     register,
@@ -37,7 +39,7 @@ export default function LoginForm() {
     try {
       await login(data);
       success('Welcome back!', 'You have been successfully logged in.');
-      router.push('/dashboard');
+      router.push(redirectPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
       errorToast('Login Failed', message);

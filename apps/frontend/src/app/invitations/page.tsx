@@ -31,7 +31,7 @@ export default function InvitationsPage() {
   };
 
   return (
-    <DashboardLayout>
+      <DashboardLayout requireAuth={true}>
       <div className="p-6">
         <div className="mb-8">
           <h2 className="text-3xl font-bold mb-2">My Invitations</h2>
@@ -66,7 +66,7 @@ export default function InvitationsPage() {
                 <Mail className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No invitations</h3>
                 <p className="text-muted-foreground">
-                  You don't have any pending organization invitations at the moment.
+                  You don&apos;t have any pending organization invitations at the moment.
                 </p>
               </div>
             ) : (
@@ -79,7 +79,7 @@ export default function InvitationsPage() {
                           {invitation.organization?.name || 'Organization'}
                         </h4>
                         <p className="text-sm text-muted-foreground mb-2">
-                          You've been invited to join as a <span className="font-medium">{invitation.role}</span>
+                          You&apos;ve been invited to join as a <span className="font-medium">{invitation.role}</span>
                         </p>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -140,7 +140,7 @@ export default function InvitationsPage() {
                   <div>
                     <h4 className="font-medium">Email Notifications</h4>
                     <p className="text-sm text-muted-foreground">
-                      You'll receive email notifications when invited to organizations
+                      You&apos;ll receive email notifications when invited to organizations
                     </p>
                   </div>
                 </div>
@@ -157,7 +157,7 @@ export default function InvitationsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
   );
 }

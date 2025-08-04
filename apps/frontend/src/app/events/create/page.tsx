@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,17 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useToast } from '@/components/ui/toast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { createEvent } from '@/lib/redux/features/eventsSlice';
 import { createEventSchema, CreateEventFormData } from '@/lib/validations/auth';
-import { Calendar, ArrowLeft, MapPin, Clock, Users, Globe, Lock } from 'lucide-react';
+import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock } from 'lucide-react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 
 export default function CreateEventPage() {
-  const { user, isAuthenticated } = useReduxAuth();
   const { success, error: errorToast } = useToast();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -43,28 +41,7 @@ export default function CreateEventPage() {
 
   const isPublic = watch('is_public');
 
-  // Redirect if not authenticated or not an organizer
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
-    if (user?.role !== 'organizer' && user?.role !== 'admin') {
-      router.push('/events');
-      return;
-    }
-
-    if (!user?.organization_id && user?.role !== 'admin') {
-      router.push('/organizations/create');
-      return;
-    }
-  }, [isAuthenticated, user, router]);
-
-  // Show loading or return null while redirecting
-  if (!isAuthenticated || (user?.role !== 'organizer' && user?.role !== 'admin') || (!user?.organization_id && user?.role !== 'admin')) {
-    return null;
-  }
+  // Authentication and role checks are now handled by middleware
 
   const onSubmit = async (data: CreateEventFormData) => {
     try {
@@ -89,7 +66,7 @@ export default function CreateEventPage() {
   const today = new Date().toISOString().split('T')[0];
 
   return (
-    <DashboardLayout>
+      <DashboardLayout requireAuth={true} allowedRoles={['admin', 'organizer']} requireOrganization={true}>
       <div className="p-6">
         <div className="max-w-2xl mx-auto">
           <div className="mb-8">
@@ -339,7 +316,7 @@ export default function CreateEventPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
   );
 }

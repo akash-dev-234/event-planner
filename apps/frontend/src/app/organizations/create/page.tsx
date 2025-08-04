@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,16 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useToast } from '@/components/ui/toast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { createOrganization } from '@/lib/redux/features/organizationSlice';
 import { createOrganizationSchema, CreateOrganizationFormData } from '@/lib/validations/auth';
 import { Building2, ArrowLeft, Users } from 'lucide-react';
 import Link from 'next/link';
+import RouteGuard from '@/components/RouteGuard';
 
 export default function CreateOrganizationPage() {
-  const { user, isAuthenticated } = useReduxAuth();
   const { success, error: errorToast } = useToast();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -35,28 +34,7 @@ export default function CreateOrganizationPage() {
     },
   });
 
-  // Redirect if not authenticated or not an organizer
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
-    if (user?.role !== 'organizer' && user?.role !== 'admin') {
-      router.push('/dashboard');
-      return;
-    }
-
-    if (user?.organization_id && user?.role !== 'admin') {
-      router.push('/dashboard');
-      return;
-    }
-  }, [isAuthenticated, user, router]);
-
-  // Show loading or return null while redirecting
-  if (!isAuthenticated || (user?.role !== 'organizer' && user?.role !== 'admin') || (user?.organization_id && user?.role !== 'admin')) {
-    return null;
-  }
+  // Authentication and role checks are now handled by middleware
 
   const onSubmit = async (data: CreateOrganizationFormData) => {
     try {
@@ -74,7 +52,8 @@ export default function CreateOrganizationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <RouteGuard requireAuth={true} allowedRoles={['admin', 'organizer']}>
+      <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 py-4">
@@ -205,7 +184,8 @@ export default function CreateOrganizationPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </RouteGuard>
   );
 }
