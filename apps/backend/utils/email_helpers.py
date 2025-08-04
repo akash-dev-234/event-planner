@@ -92,7 +92,7 @@ def send_registration_invitation_email(email, organization, inviter, role):
 
 def notify_admins_organizer_request(user):
     """Notify all admins about a new organizer role request"""
-    from auth.models import User, UserRole
+    from models import User, UserRole
     
     try:
         admins = User.query.filter_by(role=UserRole.ADMIN.value).all()
