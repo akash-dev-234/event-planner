@@ -49,7 +49,7 @@ def create_app():
         "apikey"  # This is the string "apikey", not your SendGrid username
     )
     app.config["MAIL_PASSWORD"] = os.environ.get("SENDGRID_API_KEY")
-    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_USERNAME")
+    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("VERIFIED_EMAIL")
     # Initialize extensions
     db.init_app(app)
     bcrypt.init_app(app)
