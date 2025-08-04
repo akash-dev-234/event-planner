@@ -86,9 +86,11 @@ export default function AdminPage() {
               <Button className="w-full" variant="outline">
                 View All Users
               </Button>
-              <Button className="w-full" variant="outline">
-                Organizer Requests
-              </Button>
+              <Link href="/admin/organizer-requests">
+                <Button className="w-full" variant="outline">
+                  Organizer Requests
+                </Button>
+              </Link>
             </CardContent>
           </Card>
 
