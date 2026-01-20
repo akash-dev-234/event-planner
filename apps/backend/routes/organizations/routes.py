@@ -5,7 +5,7 @@ from flask_jwt_extended import get_jwt, jwt_required
 from sqlalchemy import func
 
 from . import organization_bp as organization
-from decorators import admin_or_organizer_required, role_required
+from decorators import admin_or_organizer_required, role_required, organization_member_required
 from models import Organization, User, UserRole, OrganizationInvitation
 from extensions import db
 from utils.validators import is_valid_email
@@ -449,11 +449,12 @@ def delete_organization(org_id):
 
 
 @organization.route("/<int:org_id>", methods=["GET"])
-@admin_or_organizer_required
+@role_required("admin", "organizer", "team_member")
 def get_organization(org_id):
     """
     Get details of a specific organization.
     Users can only view their own organization details.
+    Team members and organizers can view their own organization.
     """
     try:
         # Get the current user from JWT token
@@ -560,11 +561,12 @@ def leave_organization():
 
 
 @organization.route("/<int:org_id>/members", methods=["GET"])
-@admin_or_organizer_required
+@role_required("admin", "organizer", "team_member")
 def get_organization_members(org_id):
     """
     Get all members of a specific organization with detailed information.
-    Only organization members and admins can view the member list.
+    Organization members (organizers and team_members) can view the member list.
+    Admins can view any organization's members.
     """
     try:
         # Get the current user from JWT token
