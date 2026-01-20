@@ -16,7 +16,8 @@ import {
   Plus,
   Eye,
   LogOut,
-  UserCheck
+  UserCheck,
+  Users
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -122,6 +123,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       name: 'Organizer Requests',
       href: '/admin/organizer-requests',
       icon: UserCheck,
+      show: user?.role === 'admin',
+    },
+    {
+      name: 'User Management',
+      href: '/admin/users',
+      icon: Users,
       show: user?.role === 'admin',
     },
   ];

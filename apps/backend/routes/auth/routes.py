@@ -927,15 +927,256 @@ def disable_admin_registration():
     try:
         # You could store this in database or environment variable
         # For now, we'll just return a message since the endpoint already checks for existing admins
-        
+
         admin_count = User.query.filter_by(role=UserRole.ADMIN.value).count()
-        
+
         return jsonify({
             "message": "Admin registration endpoint is automatically disabled when admins exist",
             "current_admin_count": admin_count,
             "status": "Admin registration is disabled" if admin_count > 0 else "Admin registration is available",
             "recommendation": "Remove the /register-admin endpoint from production code"
         }), 200
-        
+
     except Exception as e:
         return jsonify({"error": f"Failed to check admin registration status: {str(e)}"}), 500
+
+
+# ==================== User Management (Admin Only) ====================
+
+@auth.route("/admin/users", methods=["GET"])
+@role_required("admin")
+def get_all_users():
+    """
+    Get all users with pagination and optional search/filter
+    Query params: page, per_page, search, role
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        search = request.args.get('search', '', type=str)
+        role_filter = request.args.get('role', '', type=str)
+
+        # Base query
+        query = User.query
+
+        # Apply search filter (searches name and email)
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                db.or_(
+                    User.first_name.ilike(search_term),
+                    User.last_name.ilike(search_term),
+                    User.email.ilike(search_term)
+                )
+            )
+
+        # Apply role filter
+        if role_filter and role_filter in [r.value for r in UserRole]:
+            query = query.filter(User.role == role_filter)
+
+        # Get total count before pagination
+        total_count = query.count()
+
+        # Apply pagination
+        users = query.order_by(User.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+
+        users_data = []
+        for user in users.items:
+            org_name = None
+            if user.organization_id:
+                org = Organization.query.get(user.organization_id)
+                org_name = org.name if org else None
+
+            users_data.append({
+                'id': user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'role': user.role,
+                'organization_id': user.organization_id,
+                'organization_name': org_name,
+                'pending_organizer_approval': user.pending_organizer_approval,
+                'created_at': user.created_at.isoformat() if user.created_at else None
+            })
+
+        return jsonify({
+            'message': 'Users retrieved successfully',
+            'users': users_data,
+            'total_count': total_count,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': users.pages
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to retrieve users: {str(e)}'}), 500
+
+
+@auth.route("/admin/users/<int:user_id>/role", methods=["PUT"])
+@role_required("admin")
+def change_user_role(user_id):
+    """
+    Change a user's role (Admin only)
+    For team_member: organization_id is required
+    For organizer: organization_id is optional (can create own org later)
+    """
+    try:
+        admin_email = get_jwt_identity()
+        admin_user = User.query.filter_by(email=admin_email).first()
+
+        if not admin_user:
+            return jsonify({'error': 'Admin user not found'}), 404
+
+        # Get target user
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.get_json()
+        new_role = data.get('role')
+        organization_id = data.get('organization_id')
+
+        if not new_role:
+            return jsonify({'error': 'New role is required'}), 400
+
+        # Validate role
+        valid_roles = [r.value for r in UserRole]
+        if new_role not in valid_roles:
+            return jsonify({
+                'error': f'Invalid role. Valid roles are: {", ".join(valid_roles)}'
+            }), 400
+
+        # Prevent changing own role
+        if target_user.id == admin_user.id:
+            return jsonify({'error': 'Cannot change your own role'}), 400
+
+        # Prevent demoting the last admin
+        if target_user.role == UserRole.ADMIN.value and new_role != UserRole.ADMIN.value:
+            admin_count = User.query.filter_by(role=UserRole.ADMIN.value).count()
+            if admin_count <= 1:
+                return jsonify({'error': 'Cannot demote the only admin'}), 400
+
+        # Handle organization assignment based on new role
+        if new_role == UserRole.TEAM_MEMBER.value:
+            # Team member MUST have an organization
+            if not organization_id and not target_user.organization_id:
+                return jsonify({
+                    'error': 'Organization is required when promoting to team member'
+                }), 400
+
+            if organization_id:
+                org = Organization.query.get(organization_id)
+                if not org or org.is_deleted:
+                    return jsonify({'error': 'Organization not found'}), 404
+                target_user.organization_id = organization_id
+
+        elif new_role == UserRole.ORGANIZER.value:
+            # Organizer can optionally be assigned to an org, or create their own later
+            if organization_id:
+                org = Organization.query.get(organization_id)
+                if not org or org.is_deleted:
+                    return jsonify({'error': 'Organization not found'}), 404
+                target_user.organization_id = organization_id
+
+            # Clear pending approval
+            if target_user.pending_organizer_approval:
+                target_user.pending_organizer_approval = False
+
+        elif new_role == UserRole.GUEST.value:
+            # Clear organization when demoting to guest
+            target_user.organization_id = None
+
+        elif new_role == UserRole.ADMIN.value:
+            # Admins don't belong to organizations
+            target_user.organization_id = None
+
+        old_role = target_user.role
+        target_user.role = new_role
+
+        db.session.commit()
+
+        # Get org name for response
+        org_name = None
+        if target_user.organization_id:
+            org = Organization.query.get(target_user.organization_id)
+            org_name = org.name if org else None
+
+        return jsonify({
+            'message': f'User role changed from {old_role} to {new_role}',
+            'user': {
+                'id': target_user.id,
+                'first_name': target_user.first_name,
+                'last_name': target_user.last_name,
+                'email': target_user.email,
+                'role': target_user.role,
+                'organization_id': target_user.organization_id,
+                'organization_name': org_name
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to change user role: {str(e)}'}), 500
+
+
+@auth.route("/admin/users/<int:user_id>", methods=["DELETE"])
+@role_required("admin")
+def admin_delete_user(user_id):
+    """
+    Delete a user (Admin only)
+    """
+    try:
+        admin_email = get_jwt_identity()
+        admin_user = User.query.filter_by(email=admin_email).first()
+
+        if not admin_user:
+            return jsonify({'error': 'Admin user not found'}), 404
+
+        # Get target user
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Prevent deleting self
+        if target_user.id == admin_user.id:
+            return jsonify({'error': 'Cannot delete your own account from here. Use Settings instead.'}), 400
+
+        # Prevent deleting the last admin
+        if target_user.role == UserRole.ADMIN.value:
+            admin_count = User.query.filter_by(role=UserRole.ADMIN.value).count()
+            if admin_count <= 1:
+                return jsonify({'error': 'Cannot delete the only admin'}), 400
+
+        # Store info for response
+        deleted_user_info = {
+            'id': target_user.id,
+            'name': f"{target_user.first_name} {target_user.last_name}",
+            'email': target_user.email,
+            'role': target_user.role
+        }
+
+        # Handle organization cleanup if user is organizer
+        if target_user.organization_id and target_user.role == UserRole.ORGANIZER.value:
+            org = Organization.query.get(target_user.organization_id)
+            if org:
+                org_organizers = User.query.filter_by(
+                    organization_id=target_user.organization_id,
+                    role=UserRole.ORGANIZER.value
+                ).count()
+
+                if org_organizers <= 1:
+                    org.is_deleted = True
+
+        db.session.delete(target_user)
+        db.session.commit()
+
+        return jsonify({
+            'message': f'User {deleted_user_info["name"]} deleted successfully',
+            'deleted_user': deleted_user_info
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to delete user: {str(e)}'}), 500

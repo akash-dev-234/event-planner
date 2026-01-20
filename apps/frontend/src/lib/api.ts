@@ -439,6 +439,51 @@ class ApiClient {
     });
   }
 
+  // User Management (Admin)
+  async getAllUsers(params?: { page?: number; per_page?: number; search?: string; role?: string }): Promise<ApiResponse & {
+    users: Array<{
+      id: number;
+      first_name: string;
+      last_name: string;
+      email: string;
+      role: string;
+      organization_id: number | null;
+      organization_name: string | null;
+      pending_organizer_approval: boolean;
+      created_at: string;
+    }>;
+    total_count: number;
+    page: number;
+    per_page: number;
+    total_pages: number;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.per_page) queryParams.append('per_page', params.per_page.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.role) queryParams.append('role', params.role);
+
+    const queryString = queryParams.toString();
+    return this.request(`/api/auth/admin/users${queryString ? '?' + queryString : ''}`);
+  }
+
+  async changeUserRole(userId: number, role: string, organizationId?: number): Promise<ApiResponse & { user: User }> {
+    const body: { role: string; organization_id?: number } = { role };
+    if (organizationId) {
+      body.organization_id = organizationId;
+    }
+    return this.request(`/api/auth/admin/users/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async adminDeleteUser(userId: number): Promise<ApiResponse> {
+    return this.request(`/api/auth/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Event Guest Invitation endpoints
   async inviteGuestsToEvent(eventId: number, guests: Array<{ email: string; name?: string }>): Promise<ApiResponse & {
     successful_invitations: Array<{ email: string; name: string; invitation_id: number }>;
