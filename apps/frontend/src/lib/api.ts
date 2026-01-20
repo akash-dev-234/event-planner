@@ -484,6 +484,20 @@ class ApiClient {
     });
   }
 
+  // Organization Management (Admin)
+  async adminDeleteOrganization(orgId: number, removeMembers: boolean = true): Promise<ApiResponse & { affected_users: number; cancelled_invitations: number }> {
+    return this.request(`/api/organization/admin/${orgId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ remove_members: removeMembers }),
+    });
+  }
+
+  async adminRestoreOrganization(orgId: number): Promise<ApiResponse & { organization: Organization }> {
+    return this.request(`/api/organization/admin/${orgId}/restore`, {
+      method: 'POST',
+    });
+  }
+
   // Event Guest Invitation endpoints
   async inviteGuestsToEvent(eventId: number, guests: Array<{ email: string; name?: string }>): Promise<ApiResponse & {
     successful_invitations: Array<{ email: string; name: string; invitation_id: number }>;

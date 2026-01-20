@@ -131,6 +131,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       icon: Users,
       show: user?.role === 'admin',
     },
+    {
+      name: 'Manage Orgs',
+      href: '/admin/organizations',
+      icon: Building2,
+      show: user?.role === 'admin',
+    },
   ];
 
   const filteredNavigation = navigation.filter(item => item.show);

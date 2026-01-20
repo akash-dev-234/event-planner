@@ -506,11 +506,12 @@ def get_organization(org_id):
 
 
 @organization.route("/leave", methods=["POST"])
-@role_required("organizer")
+@role_required("organizer", "team_member")
 def leave_organization():
     """
     Allow a user to leave their current organization.
     Organizers cannot leave if they are the only organizer.
+    Team members can leave freely.
     """
     try:
         # Get the current user from JWT token
@@ -878,5 +879,101 @@ def get_organization_invitations(org_id):
         print("Error in get_organization_invitations:", str(e))
         return jsonify({
             "error": "Failed to retrieve organization invitations",
+            "details": str(e)
+        }), 500
+
+
+# ==================== Admin Organization Management ====================
+
+@organization.route("/admin/<int:org_id>/restore", methods=["POST"])
+@role_required("admin")
+def admin_restore_organization(org_id):
+    """
+    Restore a soft-deleted organization (Admin only)
+    """
+    try:
+        organization = Organization.query.get(org_id)
+        if not organization:
+            return jsonify({"error": "Organization not found"}), 404
+
+        if not organization.is_deleted:
+            return jsonify({"error": "Organization is not deleted"}), 400
+
+        # Restore the organization
+        organization.is_deleted = False
+        organization.deleted_at = None
+
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Organization '{organization.name}' restored successfully",
+            "organization": organization.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": "Failed to restore organization",
+            "details": str(e)
+        }), 500
+
+
+@organization.route("/admin/<int:org_id>", methods=["DELETE"])
+@role_required("admin")
+def admin_delete_organization(org_id):
+    """
+    Soft delete any organization (Admin only)
+    Unlike the organizer delete, this can delete any org and optionally keep members
+    """
+    try:
+        organization = Organization.query.get(org_id)
+        if not organization:
+            return jsonify({"error": "Organization not found"}), 404
+
+        if organization.is_deleted:
+            return jsonify({"error": "Organization is already deleted"}), 400
+
+        data = request.get_json() or {}
+        remove_members = data.get('remove_members', True)  # Default: remove members from org
+
+        affected_users = 0
+        cancelled_invitations = 0
+
+        if remove_members:
+            # Get all users in this organization
+            org_users = User.query.filter_by(organization_id=org_id).all()
+            affected_users = len(org_users)
+
+            # Remove all users from the organization
+            for org_user in org_users:
+                org_user.organization_id = None
+                if org_user.role in [UserRole.ORGANIZER.value, UserRole.TEAM_MEMBER.value]:
+                    org_user.role = UserRole.GUEST.value
+
+            # Cancel pending invitations
+            pending_invitations = OrganizationInvitation.query.filter_by(
+                organization_id=org_id,
+                is_accepted=False
+            ).all()
+            cancelled_invitations = len(pending_invitations)
+
+            for invitation in pending_invitations:
+                db.session.delete(invitation)
+
+        # Soft delete the organization
+        organization.soft_delete()
+
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Organization '{organization.name}' deleted successfully",
+            "affected_users": affected_users,
+            "cancelled_invitations": cancelled_invitations
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": "Failed to delete organization",
             "details": str(e)
         }), 500
