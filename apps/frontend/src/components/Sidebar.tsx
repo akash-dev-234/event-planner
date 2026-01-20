@@ -12,7 +12,6 @@ import {
   UserPlus,
   Mail,
   Settings,
-  MessageSquare,
   Plus,
   Eye,
   LogOut,
@@ -112,12 +111,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       href: '/invitations',
       icon: Mail,
       show: true,
-    },
-    {
-      name: 'Chat Assistant',
-      href: '/chat',
-      icon: MessageSquare,
-      show: !!user?.organization_id,
     },
     {
       name: 'Organizer Requests',

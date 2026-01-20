@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut, Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
 import RouteGuard from './RouteGuard';
+import ChatWidget from './ChatWidget';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -76,6 +77,9 @@ export default function DashboardLayout({
           {children}
         </main>
         </div>
+
+        {/* Floating Chat Widget */}
+        <ChatWidget />
       </div>
     </RouteGuard>
   );
