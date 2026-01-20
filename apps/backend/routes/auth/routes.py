@@ -404,10 +404,10 @@ def get_user_profile():
         # Get user email from JWT identity
         user_email = get_jwt_identity()
         user = User.query.filter_by(email=user_email).first()
-        
+
         if not user:
             return jsonify({"error": "User not found"}), 404
-        
+
         return jsonify({
             "user": {
                 "id": user.id,
@@ -418,10 +418,233 @@ def get_user_profile():
                 "organization_id": user.organization_id
             }
         }), 200
-        
+
     except Exception as e:
         return jsonify({
             "error": "Failed to fetch user profile",
+            "details": str(e)
+        }), 500
+
+
+@auth.route("/profile", methods=["PUT"])
+@jwt_required()
+def update_user_profile():
+    """
+    Update current user profile information (first_name, last_name, email)
+    """
+    try:
+        user_email = get_jwt_identity()
+        user = User.query.filter_by(email=user_email).first()
+
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Update first_name if provided
+        if "first_name" in data and data["first_name"]:
+            user.first_name = data["first_name"].strip()
+
+        # Update last_name if provided
+        if "last_name" in data and data["last_name"]:
+            user.last_name = data["last_name"].strip()
+
+        # Update email if provided and different
+        if "email" in data and data["email"] and data["email"] != user.email:
+            new_email = data["email"].strip().lower()
+
+            # Validate email format
+            if not is_valid_email(new_email):
+                return jsonify({"error": "Invalid email format"}), 400
+
+            # Check if email already exists
+            existing_user = User.query.filter_by(email=new_email).first()
+            if existing_user:
+                return jsonify({"error": "Email already in use by another account"}), 400
+
+            user.email = new_email
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Profile updated successfully",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role if isinstance(user.role, str) else user.role.value,
+                "organization_id": user.organization_id
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": "Failed to update profile",
+            "details": str(e)
+        }), 500
+
+
+@auth.route("/change-password", methods=["POST"])
+@jwt_required()
+def change_password():
+    """
+    Change current user's password (requires current password verification)
+    Sends email notification on success
+    """
+    try:
+        user_email = get_jwt_identity()
+        user = User.query.filter_by(email=user_email).first()
+
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        current_password = data.get("current_password")
+        new_password = data.get("new_password")
+
+        if not current_password or not new_password:
+            return jsonify({"error": "Current password and new password are required"}), 400
+
+        # Verify current password
+        if not user.check_password(current_password):
+            return jsonify({"error": "Current password is incorrect"}), 401
+
+        # Validate new password strength
+        if not is_strong_password(new_password):
+            return jsonify({
+                "error": "Password must be at least 8 characters long and include uppercase, lowercase, numeric, and special characters."
+            }), 400
+
+        # Check new password is different from current
+        if user.check_password(new_password):
+            return jsonify({"error": "New password cannot be the same as the current password"}), 400
+
+        # Update password
+        user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+        db.session.commit()
+
+        # Send email notification
+        try:
+            msg = Message(
+                "Password Changed - Event Planner",
+                sender=os.environ.get("VERIFIED_EMAIL"),
+                recipients=[user.email],
+            )
+            msg.html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #333; text-align: center;">Password Changed</h2>
+                <p style="color: #666; font-size: 16px;">Hello {user.first_name},</p>
+                <p style="color: #666; font-size: 16px;">Your password has been successfully changed.</p>
+                <p style="color: #666; font-size: 16px;">If you did not make this change, please contact support immediately or reset your password.</p>
+                <hr style="border: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px; text-align: center;">
+                    This is an automated security notification from Event Planner.
+                </p>
+            </div>
+            """
+            mail.send(msg)
+        except Exception as e:
+            print(f"Failed to send password change notification: {str(e)}")
+
+        return jsonify({"message": "Password changed successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": "Failed to change password",
+            "details": str(e)
+        }), 500
+
+
+@auth.route("/account", methods=["DELETE"])
+@jwt_required()
+def delete_account():
+    """
+    Delete current user's account
+    Sends email notification on success
+    """
+    try:
+        user_email = get_jwt_identity()
+        user = User.query.filter_by(email=user_email).first()
+
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        data = request.get_json() or {}
+        password = data.get("password")
+
+        # Require password confirmation for account deletion
+        if not password:
+            return jsonify({"error": "Password is required to delete account"}), 400
+
+        if not user.check_password(password):
+            return jsonify({"error": "Incorrect password"}), 401
+
+        # Prevent admin from deleting their own account if they're the only admin
+        if user.role == UserRole.ADMIN.value:
+            admin_count = User.query.filter_by(role=UserRole.ADMIN.value).count()
+            if admin_count <= 1:
+                return jsonify({"error": "Cannot delete the only admin account"}), 400
+
+        # Store user info for email before deletion
+        user_name = user.first_name
+        user_email_address = user.email
+
+        # If user is an organizer with an organization, handle cleanup
+        if user.organization_id and user.role == UserRole.ORGANIZER.value:
+            org = Organization.query.get(user.organization_id)
+            if org:
+                # Check if user is the only organizer in the organization
+                org_organizers = User.query.filter_by(
+                    organization_id=user.organization_id,
+                    role=UserRole.ORGANIZER.value
+                ).count()
+
+                if org_organizers <= 1:
+                    # Soft delete the organization if this is the only organizer
+                    org.is_deleted = True
+
+        # Delete user
+        db.session.delete(user)
+        db.session.commit()
+
+        # Send email notification
+        try:
+            msg = Message(
+                "Account Deleted - Event Planner",
+                sender=os.environ.get("VERIFIED_EMAIL"),
+                recipients=[user_email_address],
+            )
+            msg.html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #333; text-align: center;">Account Deleted</h2>
+                <p style="color: #666; font-size: 16px;">Hello {user_name},</p>
+                <p style="color: #666; font-size: 16px;">Your Event Planner account has been successfully deleted.</p>
+                <p style="color: #666; font-size: 16px;">All your data has been permanently removed from our system.</p>
+                <p style="color: #666; font-size: 16px;">We're sorry to see you go. If you ever want to come back, you're always welcome to create a new account.</p>
+                <hr style="border: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px; text-align: center;">
+                    This is an automated notification from Event Planner.
+                </p>
+            </div>
+            """
+            mail.send(msg)
+        except Exception as e:
+            print(f"Failed to send account deletion notification: {str(e)}")
+
+        return jsonify({"message": "Account deleted successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": "Failed to delete account",
             "details": str(e)
         }), 500
 

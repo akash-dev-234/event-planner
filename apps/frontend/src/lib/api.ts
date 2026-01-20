@@ -269,6 +269,27 @@ class ApiClient {
     return this.request('/api/auth/profile');
   }
 
+  async updateProfile(data: { first_name?: string; last_name?: string; email?: string }): Promise<ApiResponse & { user: User }> {
+    return this.request('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {
+    return this.request('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+  }
+
+  async deleteAccount(password: string): Promise<ApiResponse> {
+    return this.request('/api/auth/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    });
+  }
+
   async forgotPassword(data: ForgotPasswordRequest): Promise<ApiResponse> {
     return this.request('/api/auth/forgot-password', {
       method: 'POST',
