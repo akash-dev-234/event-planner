@@ -119,6 +119,7 @@ export interface CreateEventRequest {
   time: string;
   location: string;
   is_public?: boolean;
+  organization_id?: number; // Required for admins, optional for organizers (uses their org)
 }
 
 class ApiError extends Error {
@@ -174,14 +175,17 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    
+
+    // Ensure we have the latest token (handles SSR -> client hydration)
+    const token = this.getToken();
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
 
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
     const config: RequestInit = {
@@ -225,6 +229,10 @@ class ApiClient {
   }
 
   public getToken(): string | null {
+    // If no cached token, try to read from cookies (handles SSR -> client hydration)
+    if (!this.token && typeof window !== 'undefined') {
+      this.token = this.getTokenFromCookies();
+    }
     return this.token;
   }
 
@@ -257,6 +265,10 @@ class ApiClient {
     this.clearToken();
   }
 
+  async getUserProfile(): Promise<{user: User}> {
+    return this.request('/api/auth/profile');
+  }
+
   async forgotPassword(data: ForgotPasswordRequest): Promise<ApiResponse> {
     return this.request('/api/auth/forgot-password', {
       method: 'POST',
@@ -286,61 +298,65 @@ class ApiClient {
 
   // Organization endpoints
   async createOrganization(data: CreateOrganizationRequest): Promise<ApiResponse & { organization: Organization }> {
-    return this.request('/api/organizations/create', {
+    return this.request('/api/organization/create', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async getOrganization(orgId: number): Promise<ApiResponse & { organization: Organization }> {
-    return this.request(`/api/organizations/${orgId}`);
+    return this.request(`/api/organization/${orgId}`);
   }
 
   async updateOrganization(orgId: number, data: Partial<CreateOrganizationRequest>): Promise<ApiResponse & { organization: Organization }> {
-    return this.request(`/api/organizations/${orgId}`, {
+    return this.request(`/api/organization/${orgId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async deleteOrganization(orgId: number): Promise<ApiResponse> {
-    return this.request(`/api/organizations/${orgId}`, {
+    return this.request(`/api/organization/${orgId}`, {
       method: 'DELETE',
     });
   }
 
   async getOrganizationMembers(orgId: number): Promise<ApiResponse & { members: OrganizationMember[], member_count: number }> {
-    return this.request(`/api/organizations/${orgId}/members`);
+    return this.request(`/api/organization/${orgId}/members`);
   }
 
   async inviteUserToOrganization(orgId: number, data: InviteUserRequest): Promise<ApiResponse> {
-    return this.request(`/api/organizations/${orgId}/invite`, {
+    return this.request(`/api/organization/${orgId}/invite`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async removeOrganizationMember(orgId: number, memberId: number): Promise<ApiResponse> {
-    return this.request(`/api/organizations/${orgId}/members/${memberId}`, {
+    return this.request(`/api/organization/${orgId}/members/${memberId}`, {
       method: 'DELETE',
     });
   }
 
   async changeMemberRole(orgId: number, memberId: number, role: string): Promise<ApiResponse> {
-    return this.request(`/api/organizations/${orgId}/members/${memberId}/role`, {
+    return this.request(`/api/organization/${orgId}/members/${memberId}/role`, {
       method: 'PUT',
       body: JSON.stringify({ role }),
     });
   }
 
   async leaveOrganization(): Promise<ApiResponse> {
-    return this.request('/api/organizations/leave', {
+    return this.request('/api/organization/leave', {
       method: 'POST',
     });
   }
 
+  async getOrganizations(filter: 'all' | 'active' | 'deleted' = 'active'): Promise<ApiResponse & { organizations: Organization[], count: number }> {
+    return this.request(`/api/organization/list/${filter}`);
+  }
+
   async getOrganizationInvitations(orgId: number): Promise<ApiResponse & { invitations: Invitation[] }> {
-    return this.request(`/api/organizations/${orgId}/invitations`);
+    return this.request(`/api/organization/${orgId}/invitations`);
   }
 
   // Event endpoints
@@ -399,6 +415,48 @@ class ApiClient {
   async rejectOrganizerRequest(userId: number): Promise<ApiResponse> {
     return this.request(`/api/auth/admin/organizer-requests/${userId}/reject`, {
       method: 'POST',
+    });
+  }
+
+  // Event Guest Invitation endpoints
+  async inviteGuestsToEvent(eventId: number, guests: Array<{ email: string; name?: string }>): Promise<ApiResponse & {
+    successful_invitations: Array<{ email: string; name: string; invitation_id: number }>;
+    failed_invitations: Array<{ email: string; error: string }>;
+    total_sent: number;
+    total_failed: number;
+  }> {
+    return this.request(`/api/events/${eventId}/invite-guests`, {
+      method: 'POST',
+      body: JSON.stringify({ guests }),
+    });
+  }
+
+  async getEventGuestList(eventId: number): Promise<ApiResponse & {
+    event_id: number;
+    event_title: string;
+    guests: Array<{
+      id: number;
+      email: string;
+      name: string;
+      status: 'pending' | 'accepted' | 'declined';
+      invited_at: string | null;
+      responded_at: string | null;
+    }>;
+    status_counts: {
+      pending: number;
+      accepted: number;
+      declined: number;
+      total: number;
+    };
+  }> {
+    return this.request(`/api/events/${eventId}/guest-list`);
+  }
+
+  // Chat endpoint
+  async sendChatMessage(message: string): Promise<ApiResponse & { response: string }> {
+    return this.request('/api/chat/message', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
     });
   }
 }

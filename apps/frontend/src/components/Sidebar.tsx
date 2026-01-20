@@ -5,15 +5,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { Button } from '@/components/ui/button';
-import { 
-  Home, 
-  Calendar, 
-  Building2, 
-  Users, 
-  Mail, 
-  Settings, 
+import {
+  Home,
+  Calendar,
+  Building2,
+  UserPlus,
+  Mail,
+  Settings,
   MessageSquare,
-  Shield,
   Plus,
   Eye,
   LogOut,
@@ -29,7 +28,32 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const { user, logout } = useReduxAuth();
   const pathname = usePathname();
 
-  const isActive = (path: string) => pathname === path || pathname.startsWith(path);
+  const isActive = (path: string) => {
+    // Exact match
+    if (pathname === path) return true;
+    
+    // Special case for root path
+    if (path === '/') return pathname === '/';
+    
+    // For nested paths, only match if it's a direct child or exact match
+    // This prevents /events from matching /events/create
+    if (pathname.startsWith(path + '/')) {
+      // Don't highlight parent if we're on a specific child page with its own menu item
+      const childPaths = ['/events/create', '/events/[id]/edit', '/organizations/create', '/organizations/invitations'];
+      const isOnChildWithMenuItem = childPaths.some(childPath => 
+        pathname.match(childPath.replace('[id]', '\\d+')) || pathname === childPath
+      );
+      
+      // If we're on a child path that has its own menu item, don't highlight the parent
+      if (isOnChildWithMenuItem && path !== pathname) {
+        return false;
+      }
+      
+      return true;
+    }
+    
+    return false;
+  };
 
   const navigation = [
     {
@@ -64,7 +88,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       submenu: [
         {
           name: 'My Organization',
-          href: user?.organization_id ? `/organizations/${user.organization_id}` : '#',
+          href: '/organizations',
           icon: Building2,
           show: !!user?.organization_id,
         },
@@ -75,9 +99,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           show: (user?.role === 'organizer' && !user?.organization_id) || user?.role === 'admin',
         },
         {
-          name: 'Members',
-          href: user?.organization_id ? `/organizations/${user.organization_id}/members` : '#',
-          icon: Users,
+          name: 'Manage Invitations',
+          href: '/organizations/invitations',
+          icon: UserPlus,
           show: user?.role === 'organizer' && !!user?.organization_id,
         },
       ],
@@ -95,23 +119,10 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       show: !!user?.organization_id,
     },
     {
-      name: 'Admin Panel',
-      icon: Shield,
+      name: 'Organizer Requests',
+      href: '/admin/organizer-requests',
+      icon: UserCheck,
       show: user?.role === 'admin',
-      submenu: [
-        {
-          name: 'Overview',
-          href: '/admin',
-          icon: Shield,
-          show: user?.role === 'admin',
-        },
-        {
-          name: 'Pending Requests',
-          href: '/admin/organizer-requests',
-          icon: UserCheck,
-          show: user?.role === 'admin',
-        },
-      ],
     },
   ];
 
@@ -167,7 +178,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 <Link href={item.href}>
                   <Button
                     variant={isActive(item.href) ? "secondary" : "ghost"}
-                    className="w-full justify-start gap-3"
+                    className={`w-full justify-start gap-3 ${
+                      isActive(item.href) 
+                        ? 'bg-primary/10 text-primary border-l-2 border-primary' 
+                        : 'hover:bg-accent/50'
+                    }`}
                   >
                     <item.icon className="h-5 w-5" />
                     {item.name}
@@ -198,7 +213,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                             <Button
                               variant={isActive(subitem.href) ? "secondary" : "ghost"}
                               size="sm"
-                              className="w-full justify-start gap-3"
+                              className={`w-full justify-start gap-3 ${
+                                isActive(subitem.href) 
+                                  ? 'bg-primary/10 text-primary border-l-2 border-primary ml-2' 
+                                  : 'hover:bg-accent/50'
+                              }`}
                             >
                               <subitem.icon className="h-4 w-4" />
                               {subitem.name}

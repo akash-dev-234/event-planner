@@ -5,8 +5,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, User, Mail, Calendar, Check, X, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { Shield, User, Mail, Calendar, Check, X } from 'lucide-react';
 import { useReduxToast } from '@/hooks/useReduxToast';
 import { apiClient } from '@/lib/api';
 
@@ -90,20 +89,13 @@ export default function OrganizerRequestsPage() {
       <div className="p-6">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <Link href="/admin">
-              <Button variant="outline" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
-              <div>
-                <h2 className="text-3xl font-bold">Organizer Requests</h2>
-                <p className="text-muted-foreground">
-                  Review and approve organizer role requests
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <Shield className="h-8 w-8 text-primary" />
+            <div>
+              <h2 className="text-3xl font-bold">Organizer Requests</h2>
+              <p className="text-muted-foreground">
+                Review and approve organizer role requests
+              </p>
             </div>
           </div>
         </div>

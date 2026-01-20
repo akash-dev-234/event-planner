@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
@@ -16,10 +16,13 @@ import { Eye, EyeOff, Mail, Lock, User, UserCheck, ArrowRight } from 'lucide-rea
 
 export default function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [isFromInvitation, setIsFromInvitation] = useState(false);
+  const [invitationEmail, setInvitationEmail] = useState('');
   
   const { register: registerUser } = useReduxAuth();
   const { error: errorToast, success } = useReduxToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const {
     register,
@@ -40,16 +43,36 @@ export default function SignupForm() {
 
   const watchedRole = watch('role');
 
+  // Handle invitation parameters
+  useEffect(() => {
+    const email = searchParams.get('email');
+    const fromInvitation = searchParams.get('from') === 'invitation';
+    
+    if (fromInvitation && email) {
+      setIsFromInvitation(true);
+      setInvitationEmail(email);
+      setValue('email', email);
+      setValue('role', 'guest'); // Force guest role for invitations
+    }
+  }, [searchParams, setValue]);
+
   const onSubmit = async (data: RegisterFormData) => {
     try {
       await registerUser(data);
       success(
         'Registration Successful!',
-        data.role === 'organizer' 
-          ? 'Your account has been created. Your organizer request is pending admin approval.' 
-          : 'Your account has been created successfully. You can now sign in.'
+        isFromInvitation
+          ? 'Your account has been created successfully. Please sign in to accept your organization invitation.'
+          : data.role === 'organizer' 
+            ? 'Your account has been created. Your organizer request is pending admin approval.' 
+            : 'Your account has been created successfully. You can now sign in.'
       );
-      router.push('/login');
+      // Redirect to login with invitations redirect if user came from invitation
+      if (isFromInvitation) {
+        router.push('/login?redirect=/invitations');
+      } else {
+        router.push('/login');
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
       errorToast('Registration Failed', message);
@@ -66,9 +89,14 @@ export default function SignupForm() {
             </div>
             <span className="font-semibold text-lg">Event Planner</span>
           </div>
-          <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {isFromInvitation ? 'Complete your invitation' : 'Create your account'}
+          </CardTitle>
           <CardDescription>
-            Join Event Planner to start organizing amazing events
+            {isFromInvitation 
+              ? `Complete your registration to join the organization that invited ${invitationEmail}`
+              : 'Join Event Planner to start organizing amazing events'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -117,10 +145,14 @@ export default function SignupForm() {
                   id="email"
                   type="email"
                   placeholder="john@example.com"
-                  className={`pl-10 ${errors.email ? 'border-red-500 focus:border-red-500' : ''}`}
+                  className={`pl-10 ${errors.email ? 'border-red-500 focus:border-red-500' : ''} ${isFromInvitation ? 'bg-muted' : ''}`}
+                  disabled={isFromInvitation}
                   {...register('email')}
                 />
               </div>
+              {isFromInvitation && (
+                <p className="text-sm text-muted-foreground">Email pre-filled from invitation</p>
+              )}
               {errors.email && (
                 <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>
               )}
@@ -157,49 +189,51 @@ export default function SignupForm() {
               </p>
             </div>
 
-            <div className="space-y-3">
-              <Label>Account type</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setValue('role', 'guest')}
-                  className={`p-4 border rounded-lg text-left transition-colors ${
-                    watchedRole === 'guest'
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-border hover:border-border/80'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <User className="h-4 w-4" />
-                    <span className="font-medium">Guest</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Browse public events and join organizations
-                  </p>
-                </button>
+            {!isFromInvitation && (
+              <div className="space-y-3">
+                <Label>Account type</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setValue('role', 'guest')}
+                    className={`p-4 border rounded-lg text-left transition-colors ${
+                      watchedRole === 'guest'
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-border hover:border-border/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">Guest</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Browse public events and join organizations
+                    </p>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setValue('role', 'organizer')}
-                  className={`p-4 border rounded-lg text-left transition-colors ${
-                    watchedRole === 'organizer'
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-border hover:border-border/80'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <UserCheck className="h-4 w-4" />
-                    <span className="font-medium">Organizer</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Create and manage events (requires approval)
-                  </p>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setValue('role', 'organizer')}
+                    className={`p-4 border rounded-lg text-left transition-colors ${
+                      watchedRole === 'organizer'
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-border hover:border-border/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <UserCheck className="h-4 w-4" />
+                      <span className="font-medium">Organizer</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Create and manage events (requires approval)
+                    </p>
+                  </button>
+                </div>
+                {errors.role && (
+                  <p className="text-sm text-red-600 mt-1">{errors.role.message}</p>
+                )}
               </div>
-              {errors.role && (
-                <p className="text-sm text-red-600 mt-1">{errors.role.message}</p>
-              )}
-            </div>
+            )}
 
             <Button
               type="submit"
@@ -209,11 +243,11 @@ export default function SignupForm() {
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-primary-foreground/20 border-t-primary-foreground rounded-full animate-spin"></div>
-                  Creating account...
+                  {isFromInvitation ? 'Completing registration...' : 'Creating account...'}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  Create account
+                  {isFromInvitation ? 'Complete Registration' : 'Create account'}
                   <ArrowRight className="h-4 w-4" />
                 </div>
               )}

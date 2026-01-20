@@ -37,9 +37,19 @@ export default function LoginForm() {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      await login(data);
-      success('Welcome back!', 'You have been successfully logged in.');
-      router.push(redirectPath);
+      const result = await login(data);
+      
+      // Check if user has pending invitations and redirect appropriately
+      if (result?.pendingInvitations && result.pendingInvitations.length > 0) {
+        success(
+          'Welcome back!', 
+          `You have ${result.pendingInvitations.length} pending invitation(s) waiting. Redirecting to invitations...`
+        );
+        router.push('/invitations');
+      } else {
+        success('Welcome back!', 'You have been successfully logged in.');
+        router.push(redirectPath);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
       errorToast('Login Failed', message);

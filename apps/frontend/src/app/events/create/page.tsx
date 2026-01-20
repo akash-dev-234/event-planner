@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,19 +8,44 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/toast';
+import { useReduxToast } from '@/hooks/useReduxToast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { createEvent } from '@/lib/redux/features/eventsSlice';
 import { createEventSchema, CreateEventFormData } from '@/lib/validations/auth';
-import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock } from 'lucide-react';
+import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useReduxAuth } from '@/hooks/useReduxAuth';
+import { apiClient, Organization } from '@/lib/api';
 
 export default function CreateEventPage() {
-  const { success, error: errorToast } = useToast();
+  const { success, error: errorToast } = useReduxToast();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { user } = useReduxAuth();
   const { isCreating, error } = useAppSelector((state) => state.events);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
+
+  const isAdmin = user?.role === 'admin';
+
+  // Fetch organizations for admin users
+  useEffect(() => {
+    if (isAdmin) {
+      setLoadingOrgs(true);
+      apiClient.getOrganizations()
+        .then((response) => {
+          setOrganizations(response.organizations || []);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch organizations:', err);
+        })
+        .finally(() => {
+          setLoadingOrgs(false);
+        });
+    }
+  }, [isAdmin]);
 
   const {
     register,
@@ -41,18 +66,29 @@ export default function CreateEventPage() {
 
   const isPublic = watch('is_public');
 
-  // Authentication and role checks are now handled by middleware
-
   const onSubmit = async (data: CreateEventFormData) => {
+    // Admin must select an organization
+    if (isAdmin && !selectedOrgId) {
+      errorToast('Organization Required', 'Please select an organization for this event');
+      return;
+    }
+
     try {
-      const result = await dispatch(createEvent({
+      const eventData: Record<string, unknown> = {
         title: data.title,
         description: data.description || undefined,
         date: data.date,
         time: data.time,
         location: data.location,
         is_public: data.is_public,
-      })).unwrap();
+      };
+
+      // Add organization_id for admin users
+      if (isAdmin && selectedOrgId) {
+        eventData.organization_id = selectedOrgId;
+      }
+
+      const result = await dispatch(createEvent(eventData as Parameters<typeof createEvent>[0])).unwrap();
 
       success('Event Created', `${result.title} has been created successfully!`);
       router.push('/events');
@@ -66,7 +102,7 @@ export default function CreateEventPage() {
   const today = new Date().toISOString().split('T')[0];
 
   return (
-      <DashboardLayout requireAuth={true} allowedRoles={['admin', 'organizer']} requireOrganization={true}>
+      <DashboardLayout requireAuth={true} allowedRoles={['organizer', 'admin']}>
       <div className="p-6">
         <div className="max-w-2xl mx-auto">
           <div className="mb-8">
@@ -83,7 +119,7 @@ export default function CreateEventPage() {
               <div>
                 <h2 className="text-3xl font-bold">Create New Event</h2>
                 <p className="text-muted-foreground">
-                  Plan and organize your next event for your organization
+                  Plan and organize your next event{isAdmin ? '' : ' for your organization'}
                 </p>
               </div>
             </div>
@@ -101,6 +137,38 @@ export default function CreateEventPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                {/* Organization Selector for Admins */}
+                {isAdmin && (
+                  <div className="space-y-2">
+                    <Label htmlFor="organization">Organization *</Label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <select
+                        id="organization"
+                        value={selectedOrgId || ''}
+                        onChange={(e) => setSelectedOrgId(Number(e.target.value) || null)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        disabled={loadingOrgs}
+                      >
+                        <option value="">Select an organization...</option>
+                        {organizations.map((org) => (
+                          <option key={org.id} value={org.id}>
+                            {org.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {organizations.length === 0 && !loadingOrgs && (
+                      <p className="text-sm text-amber-600">
+                        No organizations found. Please create an organization first.
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      As an admin, select which organization this event belongs to
+                    </p>
+                  </div>
+                )}
+
                 {/* Event Title */}
                 <div className="space-y-2">
                   <Label htmlFor="title">Event Title *</Label>
@@ -206,7 +274,9 @@ export default function CreateEventPage() {
                         id="private"
                         value="false"
                         className="h-4 w-4"
-                        {...register('is_public')}
+                        {...register('is_public', {
+                          setValueAs: (value) => value === 'true'
+                        })}
                         defaultChecked
                       />
                       <Label htmlFor="private" className="flex items-center gap-2 cursor-pointer">
@@ -225,7 +295,9 @@ export default function CreateEventPage() {
                         id="public"
                         value="true"
                         className="h-4 w-4"
-                        {...register('is_public')}
+                        {...register('is_public', {
+                          setValueAs: (value) => value === 'true'
+                        })}
                       />
                       <Label htmlFor="public" className="flex items-center gap-2 cursor-pointer">
                         <Globe className="h-4 w-4 text-green-600" />

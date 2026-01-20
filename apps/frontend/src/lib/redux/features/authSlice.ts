@@ -105,22 +105,25 @@ export const initializeAuth = createAsyncThunk(
         return null;
       }
       
-      // Try to reconstruct user data from cookies
-      let user = null;
-      if (typeof document !== 'undefined') {
-        const userDataCookie = getCookieValue('userData');
-        
-        if (userDataCookie) {
-          try {
-            user = JSON.parse(decodeURIComponent(userDataCookie));
-          } catch {
-            // If userData cookie is invalid, user will need to log in again
-          }
+      // Validate token by fetching current user profile
+      try {
+        const profileResponse = await apiClient.getUserProfile();
+        return { 
+          token, 
+          user: profileResponse.user 
+        };
+      } catch (error) {
+        // Token is invalid or expired, clear it
+        apiClient.clearToken();
+        // Clear user data cookies
+        if (typeof document !== 'undefined') {
+          document.cookie = 'userData=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+          document.cookie = 'userRole=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+          document.cookie = 'organizationId=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
         }
+        return null;
       }
-      
-      return { token, user };
-    } catch {
+    } catch (error) {
       apiClient.clearToken();
       return rejectWithValue('Token initialization failed');
     }
@@ -237,6 +240,17 @@ const authSlice = createSlice({
           apiClient.setToken(action.payload.token);
           if (action.payload.user) {
             state.user = action.payload.user;
+            // Refresh cookies with latest user data
+            if (typeof window !== 'undefined') {
+              const userData = encodeURIComponent(JSON.stringify(action.payload.user));
+              document.cookie = `userData=${userData}; path=/; max-age=86400; SameSite=Lax`;
+              document.cookie = `userRole=${action.payload.user.role}; path=/; max-age=86400; SameSite=Lax`;
+              if (action.payload.user.organization_id) {
+                document.cookie = `organizationId=${action.payload.user.organization_id}; path=/; max-age=86400; SameSite=Lax`;
+              } else {
+                document.cookie = 'organizationId=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+              }
+            }
           }
         }
       })

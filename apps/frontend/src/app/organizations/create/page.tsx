@@ -8,16 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/toast';
+import { useReduxToast } from '@/hooks/useReduxToast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { createOrganization } from '@/lib/redux/features/organizationSlice';
 import { createOrganizationSchema, CreateOrganizationFormData } from '@/lib/validations/auth';
-import { Building2, ArrowLeft, Users } from 'lucide-react';
-import Link from 'next/link';
-import RouteGuard from '@/components/RouteGuard';
+import { Building2, Users } from 'lucide-react';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export default function CreateOrganizationPage() {
-  const { success, error: errorToast } = useToast();
+  const { success, error: errorToast } = useReduxToast();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { isCreating, error } = useAppSelector((state) => state.organization);
@@ -44,7 +43,7 @@ export default function CreateOrganizationPage() {
       })).unwrap();
 
       success('Organization Created', `${result.name} has been created successfully!`);
-      router.push('/dashboard');
+      router.push('/organizations');
     } catch (error) {
       const message = typeof error === 'string' ? error : 'Failed to create organization';
       errorToast('Creation Failed', message);
@@ -52,30 +51,8 @@ export default function CreateOrganizationPage() {
   };
 
   return (
-    <RouteGuard requireAuth={true} allowedRoles={['admin', 'organizer']}>
-      <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
-            </Link>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">EP</span>
-              </div>
-              <h1 className="text-xl font-semibold">Create Organization</h1>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+    <DashboardLayout>
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="max-w-2xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
@@ -164,7 +141,7 @@ export default function CreateOrganizationPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => router.push('/dashboard')}
+                    onClick={() => router.push('/organizations')}
                     disabled={isCreating || isSubmitting}
                   >
                     Cancel
@@ -184,8 +161,7 @@ export default function CreateOrganizationPage() {
             </CardContent>
           </Card>
         </div>
-        </main>
       </div>
-    </RouteGuard>
+    </DashboardLayout>
   );
 }

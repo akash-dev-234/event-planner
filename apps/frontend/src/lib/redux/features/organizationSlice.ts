@@ -91,6 +91,7 @@ export const fetchMyInvitations = createAsyncThunk(
       const response = await apiClient.getMyInvitations();
       return response.invitations || [];
     } catch (error) {
+      console.error('fetchMyInvitations: API error:', error);
       if (error instanceof ApiError) {
         return rejectWithValue(error.message);
       }
@@ -236,7 +237,7 @@ const organizationSlice = createSlice({
       })
       .addCase(fetchMyInvitations.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.myInvitations = (action.payload as { invitations?: Invitation[] })?.invitations || [];
+        state.myInvitations = action.payload as Invitation[];
         state.error = null;
       })
       .addCase(fetchMyInvitations.rejected, (state, action) => {

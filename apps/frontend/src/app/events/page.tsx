@@ -1,19 +1,32 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { fetchEvents, setCurrentFilter } from '@/lib/redux/features/eventsSlice';
-import { Calendar, Search, Filter, Plus, Eye, MapPin, Clock, Building2, User } from 'lucide-react';
+import { Calendar, Search, Filter, Plus, Eye, MapPin, Clock, Building2, User, Mail, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
+import { useReduxToast } from '@/hooks/useReduxToast';
+import { apiClient } from '@/lib/api';
 
 export default function EventsPage() {
   const { user } = useReduxAuth();
   const dispatch = useAppDispatch();
   const { events, isLoading, error, currentFilter, totalCount } = useAppSelector((state) => state.events);
+  const { success, error: errorToast } = useReduxToast();
+  
+  // Invite modal state
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [guestEmails, setGuestEmails] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
   useEffect(() => {
     dispatch(fetchEvents({ filter: currentFilter }));
@@ -22,6 +35,45 @@ export default function EventsPage() {
   const handleFilterChange = (filter: 'public' | 'my_org' | 'all') => {
     dispatch(setCurrentFilter(filter));
     dispatch(fetchEvents({ filter }));
+  };
+
+  const handleInviteGuests = (event: any) => {
+    setSelectedEvent(event);
+    setGuestEmails('');
+    setInviteModalOpen(true);
+  };
+
+  const handleSendInvitations = async () => {
+    if (!selectedEvent || !guestEmails.trim()) {
+      errorToast('Error', 'Please enter at least one email address');
+      return;
+    }
+
+    setIsInviting(true);
+    try {
+      // Parse emails from textarea (one per line or comma-separated)
+      const emailList = guestEmails
+        .split(/[,\n]/)
+        .map(email => email.trim())
+        .filter(email => email.length > 0)
+        .map(email => ({ email, name: '' })); // Optional name field empty for now
+
+      const response = await apiClient.inviteGuestsToEvent(selectedEvent.id, emailList);
+
+      success(
+        'Invitations Sent!', 
+        `Successfully sent ${response.total_sent} invitation(s) to ${selectedEvent.title}`
+      );
+      
+      setInviteModalOpen(false);
+      setGuestEmails('');
+      setSelectedEvent(null);
+      
+    } catch (error) {
+      errorToast('Failed to Send Invitations', error as string || 'An error occurred while sending invitations');
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   return (
@@ -34,7 +86,7 @@ export default function EventsPage() {
               Discover and manage events in your organization and community
             </p>
           </div>
-          {user?.role === 'organizer' && (
+          {(user?.role === 'organizer' || user?.role === 'admin') && (
             <Link href="/events/create">
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -169,18 +221,29 @@ export default function EventsPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Link href={`/events/${event.id}`}>
                           <Button size="sm" variant="outline">
                             View Details
                           </Button>
                         </Link>
                         {event.can_edit && (
-                          <Link href={`/events/${event.id}/edit`}>
-                            <Button size="sm">
-                              Edit
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleInviteGuests(event)}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                            >
+                              <UserPlus className="h-4 w-4 mr-1" />
+                              Invite Guests
                             </Button>
-                          </Link>
+                            <Link href={`/events/${event.id}/edit`}>
+                              <Button size="sm">
+                                Edit
+                              </Button>
+                            </Link>
+                          </>
                         )}
                       </div>
                     </div>
@@ -221,6 +284,77 @@ export default function EventsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Invite Guests Modal */}
+        <Dialog open={inviteModalOpen} onOpenChange={setInviteModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-blue-600" />
+                Invite Guests to Event
+              </DialogTitle>
+              <DialogDescription>
+                Send event invitations to guests via email. They'll receive a beautiful invitation with accept/decline options.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedEvent && (
+              <div className="space-y-4">
+                {/* Event Info */}
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <h4 className="font-medium text-blue-900">{selectedEvent.title}</h4>
+                  <p className="text-sm text-blue-700">
+                    {new Date(selectedEvent.date).toLocaleDateString()} at {selectedEvent.time} • {selectedEvent.location}
+                  </p>
+                </div>
+
+                {/* Email Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="guest-emails">Guest Email Addresses</Label>
+                  <Textarea
+                    id="guest-emails"
+                    placeholder="Enter email addresses (one per line or comma-separated)&#10;example@email.com&#10;guest@domain.com, another@email.com"
+                    value={guestEmails}
+                    onChange={(e) => setGuestEmails(e.target.value)}
+                    rows={4}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    💡 Guests will receive a beautiful email invitation with event details and can accept/decline with one click.
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    onClick={handleSendInvitations} 
+                    disabled={isInviting || !guestEmails.trim()}
+                    className="flex-1"
+                  >
+                    {isInviting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4 mr-2" />
+                        Send Invitations
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setInviteModalOpen(false)}
+                    disabled={isInviting}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
         </div>
       </DashboardLayout>
   );
