@@ -282,6 +282,42 @@ class Event(db.Model):
         return data
 
 
+class EventInvitation(db.Model):
+    """Event invitations for external guests (no platform access)"""
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("event.id"), nullable=False)
+    guest_email = db.Column(db.String(150), nullable=False)
+    guest_name = db.Column(db.String(100), nullable=True)  # Optional guest name
+    status = db.Column(db.String(20), default='pending')  # pending, accepted, declined
+    invitation_token = db.Column(db.String(255), nullable=False, unique=True)  # Secure token for email links
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    responded_at = db.Column(db.DateTime, nullable=True)  # When guest responded
+    reminder_24h_sent = db.Column(db.Boolean, default=False)  # 24-hour reminder sent
+    reminder_1h_sent = db.Column(db.Boolean, default=False)   # 1-hour reminder sent
+    
+    # Relationships
+    event = db.relationship("Event", backref="guest_invitations")
+    
+    def __init__(self, event_id, guest_email, guest_name=None):
+        self.event_id = event_id
+        self.guest_email = guest_email
+        self.guest_name = guest_name
+        # Generate secure token for email links
+        import secrets
+        self.invitation_token = secrets.token_urlsafe(32)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'event_id': self.event_id,
+            'guest_email': self.guest_email,
+            'guest_name': self.guest_name,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'responded_at': self.responded_at.isoformat() if self.responded_at else None,
+        }
+
+
 class OrganizationInvitation(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     email=db.Column(db.String(150), nullable=False)

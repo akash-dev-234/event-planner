@@ -13,18 +13,19 @@ from utils.email_helpers import send_invitation_email, send_registration_invitat
 
 
 @organization.route("/create", methods=["POST"])
-@role_required("organizer")
+@role_required("organizer", "admin")
 def create_organization():
     try:
         jwt_data = get_jwt()
         user_id = jwt_data.get('user_id')
+        user_role = jwt_data.get('role')
         user = User.query.get(user_id)
-        
+
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        # Check if user already belongs to an organization
-        if user.organization_id is not None:
+        # Check if user already belongs to an organization (admins can create without joining)
+        if user.organization_id is not None and user_role != 'admin':
             current_org = Organization.query.get(user.organization_id)
             return jsonify({
                 "error": f"You already belong to an organization: {current_org.name}. Please leave it first before creating a new one."
@@ -68,16 +69,22 @@ def create_organization():
             name=clean_name,
             description=description.strip() if description else None
         )
-        
+
         db.session.add(new_organization)
         db.session.flush()  # This assigns an ID without committing
-        
-        # Now set the user's organization_id
-        user.organization_id = new_organization.id
+
+        # Set the user's organization_id (admins don't join, they just create)
+        if user_role != 'admin':
+            user.organization_id = new_organization.id
+
         db.session.commit()
-        
+
+        message = "Organization created successfully!"
+        if user_role == 'admin':
+            message += " (Admin users are not automatically assigned to organizations)"
+
         return jsonify({
-            "message": "Organization created successfully!",
+            "message": message,
             "organization": new_organization.to_dict()
         }), 201
         
@@ -165,7 +172,7 @@ def invite_user_to_organization(org_id):
             return jsonify({"error": "No JSON data provided"}), 400
 
         email = data.get("email")
-        role = data.get("role", UserRole.TEAM_MEMBER.value)  # Default to team_member instead of guest
+        role = data.get("role", UserRole.TEAM_MEMBER.value)  # Only team_members can join organizations
 
         # Validate input
         if not email:
@@ -174,11 +181,12 @@ def invite_user_to_organization(org_id):
         if not is_valid_email(email):
             return jsonify({"error": "Invalid email format"}), 400
 
-        # Validate role
-        valid_invite_roles = [UserRole.GUEST.value, UserRole.TEAM_MEMBER.value]
+        # Validate role - only team_members can be invited to organizations
+        # Guests should be invited to specific events, not organizations
+        valid_invite_roles = [UserRole.TEAM_MEMBER.value]
         if role not in valid_invite_roles:
             return jsonify({
-                "error": f"Invalid role. Can only invite users as: {', '.join(valid_invite_roles)}"
+                "error": "Only team members can be invited to organizations. To invite guests, create events and invite them to specific events instead."
             }), 400
 
         # Check if organization exists and is active

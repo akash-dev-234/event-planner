@@ -394,6 +394,38 @@ def accept_invitation():
         }), 500
 
 
+@auth.route("/profile", methods=["GET"])
+@jwt_required()
+def get_user_profile():
+    """
+    Get current user profile information
+    """
+    try:
+        # Get user email from JWT identity
+        user_email = get_jwt_identity()
+        user = User.query.filter_by(email=user_email).first()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        return jsonify({
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role if isinstance(user.role, str) else user.role.value,
+                "organization_id": user.organization_id
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to fetch user profile",
+            "details": str(e)
+        }), 500
+
+
 @auth.route("/my-invitations", methods=["GET"])
 @jwt_required()
 def get_my_invitations():

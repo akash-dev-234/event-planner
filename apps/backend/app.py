@@ -22,14 +22,20 @@ def create_app():
     app.config['DEBUG'] = True
     app.config['PROPAGATE_EXCEPTIONS'] = True
     
-    # Enable CORS for all routes
-    CORS(app, origins=['http://localhost:3000', 'http://frontend:3000'], 
-         supports_credentials=True)
+    # Enable CORS for all routes - more permissive for development
+    CORS(app, 
+         origins=['http://localhost:3000', 'http://127.0.0.1:3000', 'http://frontend:3000'], 
+         supports_credentials=True,
+         allow_headers=['Content-Type', 'Authorization'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
     app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
     app.config['JWT_TOKEN_LOCATION'] = ['headers']
     app.config['JWT_HEADER_NAME'] = 'Authorization'
-    app.config['JWT_HEADER_TYPE'] = 'Bearer'    
+    app.config['JWT_HEADER_TYPE'] = 'Bearer'
+    # Set JWT token to expire in 24 hours (86400 seconds)
+    from datetime import timedelta
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)    
     
     backend_dir = os.path.abspath(os.path.dirname(__file__))
     

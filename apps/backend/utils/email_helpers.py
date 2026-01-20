@@ -10,7 +10,7 @@ def send_invitation_email(user, organization, inviter, role):
         login_url = f"{frontend_url}/login"
 
         msg = Message(
-            f"Invitation to join {organization.name}",
+            "Organization Invitation",
             sender=os.environ.get("VERIFIED_EMAIL"),
             recipients=[user.email],
         )
@@ -53,17 +53,17 @@ def send_registration_invitation_email(email, organization, inviter, role):
     """Send invitation email to unregistered users"""
     try:
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-        registration_url = f"{frontend_url}/register"
+        registration_url = f"{frontend_url}/signup?email={email}&from=invitation"
         
         msg = Message(
-            f"You're invited to join {organization.name}",
+            "Organization Invitation",
             sender=os.environ.get("VERIFIED_EMAIL"),
             recipients=[email],
         )
         
         msg.html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #333; text-align: center;">You're Invited!</h2>
+            <h2 style="color: #333; text-align: center;">Organization Invitation</h2>
             <p style="color: #666; font-size: 16px;">Hello,</p>
             <p style="color: #666; font-size: 16px;">
                 {inviter.first_name} {inviter.last_name} has invited you to join 
@@ -81,6 +81,12 @@ def send_registration_invitation_email(email, organization, inviter, role):
                 </a>
             </div>
             <p style="color: #666; font-size: 14px;">This invitation will expire in 7 days.</p>
+            <p style="color: #666; font-size: 14px;">If you're having trouble clicking the button, copy and paste this URL into your browser:</p>
+            <p style="color: #666; font-size: 14px; word-break: break-all;">{registration_url}</p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+                This email was sent by Event Planner. Please do not reply to this email.
+            </p>
         </div>
         """
         
@@ -178,4 +184,136 @@ def notify_user_organizer_approval(user, approved, admin_name):
         mail.send(msg)
         
     except Exception as e:
+        raise e
+
+def send_event_invitation_email(event_invitation, event, organizer):
+    """Send event invitation email to external guest"""
+    try:
+        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+        accept_url = f"{frontend_url}/event-rsvp/{event_invitation.invitation_token}?response=accept"
+        decline_url = f"{frontend_url}/event-rsvp/{event_invitation.invitation_token}?response=decline"
+        
+        guest_name = event_invitation.guest_name or "Guest"
+        
+        msg = Message(
+            f"Event Invitation: {event.title}",
+            sender=os.environ.get("VERIFIED_EMAIL"),
+            recipients=[event_invitation.guest_email],
+        )
+        
+        # Format event date and time
+        event_datetime = f"{event.date.strftime('%B %d, %Y')} at {event.time.strftime('%I:%M %p')}"
+        
+        msg.html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #333; text-align: center;">🎉 You're Invited!</h2>
+            <p style="color: #666; font-size: 16px;">Hello {guest_name},</p>
+            <p style="color: #666; font-size: 16px;">
+                {organizer.first_name} {organizer.last_name} has invited you to attend:
+            </p>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+                <h3 style="margin: 0 0 10px 0; color: #333;">{event.title}</h3>
+                <p style="margin: 5px 0; color: #555;"><strong>📅 When:</strong> {event_datetime}</p>
+                <p style="margin: 5px 0; color: #555;"><strong>📍 Where:</strong> {event.location}</p>
+                <div style="margin: 15px 0; color: #666;">
+                    <strong>Description:</strong><br>
+                    {event.description}
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{accept_url}" 
+                   style="background-color: #28a745; 
+                          color: white; 
+                          padding: 12px 25px; 
+                          text-decoration: none; 
+                          border-radius: 4px; 
+                          display: inline-block;
+                          margin: 0 10px;">
+                    ✅ Accept Invitation
+                </a>
+                <a href="{decline_url}" 
+                   style="background-color: #dc3545; 
+                          color: white; 
+                          padding: 12px 25px; 
+                          text-decoration: none; 
+                          border-radius: 4px; 
+                          display: inline-block;
+                          margin: 0 10px;">
+                    ❌ Decline Invitation
+                </a>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; text-align: center;">
+                Click one of the buttons above to respond to this invitation.
+            </p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+                This email was sent by Event Planner. You received this because you were invited to an event.
+            </p>
+        </div>
+        """
+        
+        mail.send(msg)
+        
+    except Exception as e:
+        print(f"Failed to send event invitation email: {str(e)}")
+        raise e
+
+
+def send_event_reminder_email(event_invitation, event, hours_before):
+    """Send event reminder email to guests who accepted"""
+    try:
+        if event_invitation.status != 'accepted':
+            return  # Only send reminders to guests who accepted
+            
+        guest_name = event_invitation.guest_name or "Guest"
+        
+        if hours_before == 24:
+            subject = f"Reminder: {event.title} is tomorrow"
+            time_text = "tomorrow"
+        elif hours_before == 1:
+            subject = f"Final Reminder: {event.title} is in 1 hour"
+            time_text = "in 1 hour"
+        else:
+            subject = f"Reminder: {event.title}"
+            time_text = f"in {hours_before} hours"
+        
+        msg = Message(
+            subject,
+            sender=os.environ.get("VERIFIED_EMAIL"),
+            recipients=[event_invitation.guest_email],
+        )
+        
+        event_datetime = f"{event.date.strftime('%B %d, %Y')} at {event.time.strftime('%I:%M %p')}"
+        
+        msg.html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #333; text-align: center;">⏰ Event Reminder</h2>
+            <p style="color: #666; font-size: 16px;">Hello {guest_name},</p>
+            <p style="color: #666; font-size: 16px;">
+                This is a reminder that <strong>{event.title}</strong> is {time_text}.
+            </p>
+            
+            <div style="background: #e8f4fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+                <h3 style="margin: 0 0 10px 0; color: #333;">{event.title}</h3>
+                <p style="margin: 5px 0; color: #004085;"><strong>📅 When:</strong> {event_datetime}</p>
+                <p style="margin: 5px 0; color: #004085;"><strong>📍 Where:</strong> {event.location}</p>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">
+                We look forward to seeing you there!
+            </p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+                This email was sent by Event Planner. You're receiving this because you accepted an invitation to this event.
+            </p>
+        </div>
+        """
+        
+        mail.send(msg)
+        
+    except Exception as e:
+        print(f"Failed to send event reminder email: {str(e)}")
         raise e

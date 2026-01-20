@@ -9,38 +9,53 @@ from . import events_bp as events
 
 
 @events.route("/create", methods=["POST"])
-@role_required("organizer")
+@role_required("organizer", "admin")
 def create_event():
     """
     Create a new event.
-    Only organizers can create events for their organization.
+    Organizers create events for their organization.
+    Admins can create events for any organization (must specify organization_id).
     """
     try:
         # Get the current user from JWT token
         jwt_data = get_jwt()
         user_id = jwt_data.get('user_id')
+        user_role = jwt_data.get('role')
         user = User.query.get(user_id)
-        
+
         if not user:
             return jsonify({"error": "User not found"}), 404
-
-        # Check if user belongs to an organization
-        if not user.organization_id:
-            return jsonify({
-                "error": "You must belong to an organization to create events"
-            }), 400
-
-        # Get the organization
-        organization = Organization.query.get(user.organization_id)
-        if not organization or organization.is_deleted:
-            return jsonify({
-                "error": "Organization not found or has been deleted"
-            }), 404
 
         # Get request data
         data = request.get_json()
         if not data:
             return jsonify({"error": "No JSON data provided"}), 400
+
+        # Determine organization_id based on role
+        if user_role == 'admin':
+            # Admins must specify organization_id in the request
+            org_id = data.get("organization_id")
+            if not org_id:
+                return jsonify({
+                    "error": "Admins must specify organization_id when creating events"
+                }), 400
+            organization = Organization.query.get(org_id)
+            if not organization or organization.is_deleted:
+                return jsonify({
+                    "error": "Organization not found or has been deleted"
+                }), 404
+        else:
+            # Organizers use their own organization
+            if not user.organization_id:
+                return jsonify({
+                    "error": "You must belong to an organization to create events"
+                }), 400
+            org_id = user.organization_id
+            organization = Organization.query.get(org_id)
+            if not organization or organization.is_deleted:
+                return jsonify({
+                    "error": "Organization not found or has been deleted"
+                }), 404
 
         # Extract and validate required fields
         title = data.get("title")
@@ -96,7 +111,7 @@ def create_event():
             time=parsed_time,
             location=location.strip(),
             is_public=bool(is_public),
-            organization_id=user.organization_id,
+            organization_id=org_id,
             user_id=user.id
         )
 
@@ -190,6 +205,14 @@ def get_events():
                     'name': f"{organizer.first_name} {organizer.last_name}",
                     'email': organizer.email
                 }
+            
+            # Add edit permissions
+            can_edit = (
+                user.id == event.user_id or  # Event creator
+                (user.organization_id == event.organization_id and user.role == UserRole.ORGANIZER.value) or  # Same org organizer
+                user.role == UserRole.ADMIN.value  # Admin
+            )
+            event_dict['can_edit'] = can_edit
             
             events_data.append(event_dict)
 
@@ -287,7 +310,7 @@ def get_event(event_id):
 
 
 @events.route("/<int:event_id>", methods=["PUT"])
-@role_required("organizer")
+@role_required("organizer", "admin")
 def update_event(event_id):
     """
     Update an event.
@@ -381,7 +404,7 @@ def update_event(event_id):
 
 
 @events.route("/<int:event_id>", methods=["DELETE"])
-@role_required("organizer")
+@role_required("organizer", "admin")
 def delete_event(event_id):
     """
     Soft delete an event.
