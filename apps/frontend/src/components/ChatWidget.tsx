@@ -110,8 +110,8 @@ export default function ChatWidget() {
     setIsMinimized(true);
   };
 
-  // Only show for users with organization
-  if (!user?.organization_id) {
+  // Only show for users with organization or admin users
+  if (!user?.organization_id && user?.role !== 'admin') {
     return null;
   }
 

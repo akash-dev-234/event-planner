@@ -609,7 +609,7 @@ def delete_account():
 
                 if org_organizers <= 1:
                     # Soft delete the organization if this is the only organizer
-                    org.is_deleted = True
+                    org.soft_delete()
 
         # Delete user
         db.session.delete(user)
@@ -1157,6 +1157,12 @@ def admin_delete_user(user_id):
             'role': target_user.role
         }
 
+        # Handle events created by this user - soft delete them
+        from models import Event
+        user_events = Event.query.filter_by(user_id=target_user.id).all()
+        for event in user_events:
+            event.soft_delete()
+
         # Handle organization cleanup if user is organizer
         if target_user.organization_id and target_user.role == UserRole.ORGANIZER.value:
             org = Organization.query.get(target_user.organization_id)
@@ -1167,7 +1173,7 @@ def admin_delete_user(user_id):
                 ).count()
 
                 if org_organizers <= 1:
-                    org.is_deleted = True
+                    org.soft_delete()
 
         db.session.delete(target_user)
         db.session.commit()

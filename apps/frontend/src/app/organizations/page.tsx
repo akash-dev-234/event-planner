@@ -128,7 +128,25 @@ export default function OrganizationPage() {
     );
   }
 
+  // Redirect admin to admin organizations page
+  useEffect(() => {
+    if (user && !user.organization_id && user.role === 'admin') {
+      router.push('/admin/organizations');
+    }
+  }, [user, router]);
+
   if (!user.organization_id) {
+    // Show loading for admin while redirecting
+    if (user.role === 'admin') {
+      return (
+        <DashboardLayout>
+          <div className="text-center py-12">
+            <p>Redirecting to organization management...</p>
+          </div>
+        </DashboardLayout>
+      );
+    }
+
     return (
       <DashboardLayout>
         <div className="max-w-2xl mx-auto">

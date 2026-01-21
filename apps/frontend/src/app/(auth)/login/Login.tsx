@@ -38,11 +38,18 @@ export default function LoginForm() {
   const onSubmit = async (data: LoginFormData) => {
     try {
       const result = await login(data);
-      
+
+      // Admin users always go to dashboard
+      if (result?.user?.role === 'admin') {
+        success('Welcome back!', 'You have been successfully logged in.');
+        router.push('/dashboard');
+        return;
+      }
+
       // Check if user has pending invitations and redirect appropriately
       if (result?.pendingInvitations && result.pendingInvitations.length > 0) {
         success(
-          'Welcome back!', 
+          'Welcome back!',
           `You have ${result.pendingInvitations.length} pending invitation(s) waiting. Redirecting to invitations...`
         );
         router.push('/invitations');

@@ -107,7 +107,7 @@ export const createEventSchema = z.object({
   time: z
     .string()
     .min(1, 'Event time is required')
-    .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)'),
+    .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/, 'Invalid time format'),
   location: z
     .string()
     .min(1, 'Event location is required')

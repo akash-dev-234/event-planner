@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
+import { useReduxToast } from '@/hooks/useReduxToast';
 import { apiClient, Organization } from '@/lib/api';
 import { Users, Search, ChevronLeft, ChevronRight, Trash2, Shield, Loader2, X } from 'lucide-react';
 
@@ -46,6 +47,7 @@ const getRoleBadgeColor = (role: string) => {
 
 export default function AdminUsersPage() {
   const { user } = useReduxAuth();
+  const { success, error: errorToast } = useReduxToast();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,10 +141,11 @@ export default function AdminUsersPage() {
       await apiClient.changeUserRole(userId, newRole, orgId || undefined);
       setRoleChangeModal(null);
       setSelectedOrgId(null);
+      success('Role Changed', `User role has been updated to ${newRole.replace('_', ' ')}`);
       await fetchUsers();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to change role';
-      alert(errorMessage);
+      errorToast('Role Change Failed', errorMessage);
     } finally {
       setActionLoading(null);
     }
@@ -155,7 +158,7 @@ export default function AdminUsersPage() {
 
     // For team_member, org is required
     if (newRole === 'team_member' && !selectedOrgId) {
-      alert('Please select an organization for team member');
+      errorToast('Organization Required', 'Please select an organization for team member');
       return;
     }
 
@@ -167,10 +170,11 @@ export default function AdminUsersPage() {
     try {
       await apiClient.adminDeleteUser(userId);
       setDeleteConfirm(null);
+      success('User Deleted', 'The user has been successfully deleted');
       await fetchUsers();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete user';
-      alert(errorMessage);
+      errorToast('Delete Failed', errorMessage);
     } finally {
       setActionLoading(null);
     }

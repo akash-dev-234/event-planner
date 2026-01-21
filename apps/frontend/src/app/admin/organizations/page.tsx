@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
+import { useReduxToast } from '@/hooks/useReduxToast';
 import { apiClient, Organization } from '@/lib/api';
 import { Building2, Trash2, RotateCcw, Loader2, Users, Calendar } from 'lucide-react';
 
@@ -12,6 +13,7 @@ type FilterType = 'all' | 'active' | 'deleted';
 
 export default function AdminOrganizationsPage() {
   const { user } = useReduxAuth();
+  const { success, error: errorToast } = useReduxToast();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +46,11 @@ export default function AdminOrganizationsPage() {
     try {
       await apiClient.adminDeleteOrganization(orgId, true);
       setDeleteConfirm(null);
+      success('Organization Deleted', 'The organization has been successfully deleted');
       await fetchOrganizations();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete organization';
-      alert(errorMessage);
+      errorToast('Delete Failed', errorMessage);
     } finally {
       setActionLoading(null);
     }
@@ -57,10 +60,11 @@ export default function AdminOrganizationsPage() {
     setActionLoading(orgId);
     try {
       await apiClient.adminRestoreOrganization(orgId);
+      success('Organization Restored', 'The organization has been successfully restored');
       await fetchOrganizations();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to restore organization';
-      alert(errorMessage);
+      errorToast('Restore Failed', errorMessage);
     } finally {
       setActionLoading(null);
     }

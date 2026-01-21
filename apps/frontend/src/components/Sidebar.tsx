@@ -93,6 +93,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           show: !!user?.organization_id,
         },
         {
+          name: 'Orgs',
+          href: '/admin/organizations',
+          icon: Building2,
+          show: user?.role === 'admin',
+        },
+        {
           name: 'Create Organization',
           href: '/organizations/create',
           icon: Plus,
@@ -110,7 +116,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       name: 'Invitations',
       href: '/invitations',
       icon: Mail,
-      show: true,
+      show: user?.role !== 'admin', // Admin doesn't receive org invitations
     },
     {
       name: 'Organizer Requests',
@@ -122,12 +128,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       name: 'User Management',
       href: '/admin/users',
       icon: Users,
-      show: user?.role === 'admin',
-    },
-    {
-      name: 'Manage Orgs',
-      href: '/admin/organizations',
-      icon: Building2,
       show: user?.role === 'admin',
     },
   ];

@@ -123,7 +123,7 @@ export default function EditEventPage() {
     return (
       <DashboardLayout requireAuth={true}>
         <div className="p-6">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <div className="text-center py-12">
               <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-muted-foreground">Loading event details...</p>
@@ -138,7 +138,7 @@ export default function EditEventPage() {
     return (
       <DashboardLayout requireAuth={true}>
         <div className="p-6">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <div className="text-center py-12">
               <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Event not found</h3>
@@ -159,7 +159,7 @@ export default function EditEventPage() {
     return (
       <DashboardLayout requireAuth={true}>
         <div className="p-6">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <div className="text-center py-12">
               <Lock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Access Denied</h3>
@@ -179,7 +179,7 @@ export default function EditEventPage() {
   return (
     <DashboardLayout requireAuth={true}>
       <div className="p-6">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-4 mb-4">
               <Link href={`/events/${eventId}`}>

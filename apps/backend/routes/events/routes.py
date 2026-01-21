@@ -101,9 +101,12 @@ def create_event():
         except ValueError:
             return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
 
-        # Validate and parse time
+        # Validate and parse time (handle both HH:MM and HH:MM:SS formats)
         try:
-            parsed_time = datetime.strptime(event_time, "%H:%M").time()
+            if len(event_time) == 5:  # HH:MM
+                parsed_time = datetime.strptime(event_time, "%H:%M").time()
+            else:  # HH:MM:SS
+                parsed_time = datetime.strptime(event_time, "%H:%M:%S").time()
         except ValueError:
             return jsonify({"error": "Invalid time format. Use HH:MM"}), 400
 
@@ -442,7 +445,12 @@ def update_event(event_id):
 
         if 'time' in data:
             try:
-                parsed_time = datetime.strptime(data['time'], "%H:%M").time()
+                time_str = data['time']
+                # Handle both HH:MM and HH:MM:SS formats
+                if len(time_str) == 5:  # HH:MM
+                    parsed_time = datetime.strptime(time_str, "%H:%M").time()
+                else:  # HH:MM:SS
+                    parsed_time = datetime.strptime(time_str, "%H:%M:%S").time()
                 event.time = parsed_time
             except ValueError:
                 return jsonify({"error": "Invalid time format. Use HH:MM"}), 400

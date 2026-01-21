@@ -902,7 +902,6 @@ def admin_restore_organization(org_id):
             return jsonify({"error": "Organization is not deleted"}), 400
 
         # Restore the organization
-        organization.is_deleted = False
         organization.deleted_at = None
 
         db.session.commit()

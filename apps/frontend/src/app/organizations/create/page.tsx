@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useReduxToast } from '@/hooks/useReduxToast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
-import { createOrganization } from '@/lib/redux/features/organizationSlice';
+import { createOrganization, clearError } from '@/lib/redux/features/organizationSlice';
 import { createOrganizationSchema, CreateOrganizationFormData } from '@/lib/validations/auth';
 import { Building2, Users } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -20,6 +20,11 @@ export default function CreateOrganizationPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { isCreating, error } = useAppSelector((state) => state.organization);
+
+  // Clear any stale errors when component mounts
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
 
   const {
     register,
@@ -53,7 +58,7 @@ export default function CreateOrganizationPage() {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <Building2 className="h-8 w-8 text-primary" />
