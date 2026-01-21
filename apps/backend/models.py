@@ -14,6 +14,16 @@ class UserRole(Enum):
     GUEST = "guest"
 
 
+class EventCategory(Enum):
+    CONFERENCE = "conference"
+    MEETUP = "meetup"
+    WORKSHOP = "workshop"
+    SOCIAL = "social"
+    NETWORKING = "networking"
+    WEBINAR = "webinar"
+    OTHER = "other"
+
+
 class Organization(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(
@@ -201,13 +211,14 @@ class Event(db.Model):
     location = db.Column(db.String(255), nullable=False)
     is_public = db.Column(db.Boolean, default=False)
     time = db.Column(db.Time, nullable=False)
+    category = db.Column(db.String(50), default=EventCategory.OTHER.value)  # Event category
     organization_id = db.Column(
         db.Integer, db.ForeignKey("organization.id"), nullable=False
     )  # Required for events
     user_id = db.Column(
         db.Integer, db.ForeignKey("user.id"), nullable=False
     )  # Required for events
-    
+
     # Add timestamp fields for tracking
     created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
@@ -223,6 +234,7 @@ class Event(db.Model):
         time,
         organization_id,
         user_id,
+        category=None,
     ):
         self.title = title
         self.description = description
@@ -232,6 +244,7 @@ class Event(db.Model):
         self.time = time
         self.organization_id = organization_id  # Set the organization ID
         self.user_id = user_id  # Set the user ID (organizer)
+        self.category = category or EventCategory.OTHER.value
     
     @property
     def is_deleted(self):
@@ -267,18 +280,19 @@ class Event(db.Model):
             'time': self.time.isoformat() if self.time else None,
             'location': self.location,
             'is_public': self.is_public,
+            'category': self.category,
             'organization_id': self.organization_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
-        
+
         if include_private:
             data.update({
                 'user_id': self.user_id,
                 'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
                 'is_deleted': self.is_deleted
             })
-        
+
         return data
 
 

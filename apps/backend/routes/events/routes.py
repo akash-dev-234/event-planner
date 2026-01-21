@@ -3,9 +3,23 @@ from datetime import datetime, date, time
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from decorators import admin_or_organizer_required, role_required
-from models import Event, Organization, User, UserRole
+from models import Event, Organization, User, UserRole, EventCategory
 from extensions import db
 from . import events_bp as events
+
+
+@events.route("/categories", methods=["GET"])
+@jwt_required()
+def get_categories():
+    """Get all available event categories"""
+    categories = [
+        {"value": c.value, "label": c.value.replace("_", " ").title()}
+        for c in EventCategory
+    ]
+    return jsonify({
+        "message": "Categories retrieved successfully",
+        "categories": categories
+    }), 200
 
 
 @events.route("/create", methods=["POST"])
@@ -64,6 +78,7 @@ def create_event():
         event_time = data.get("time")
         location = data.get("location")
         is_public = data.get("is_public", False)
+        category = data.get("category", EventCategory.OTHER.value)
 
         # Validate required fields
         required_fields = {
@@ -103,6 +118,13 @@ def create_event():
         if len(location.strip()) < 3:
             return jsonify({"error": "Event location must be at least 3 characters long"}), 400
 
+        # Validate category
+        valid_categories = [c.value for c in EventCategory]
+        if category not in valid_categories:
+            return jsonify({
+                "error": f"Invalid category. Valid options: {', '.join(valid_categories)}"
+            }), 400
+
         # Create new event
         new_event = Event(
             title=title.strip(),
@@ -112,7 +134,8 @@ def create_event():
             location=location.strip(),
             is_public=bool(is_public),
             organization_id=org_id,
-            user_id=user.id
+            user_id=user.id,
+            category=category
         )
 
         db.session.add(new_event)
@@ -140,13 +163,16 @@ def get_events():
     - Public events: visible to all users
     - Organization events: visible to organization members
     - Filter options: 'public', 'my_org', 'all' (admin only)
+    - Search: search by title, description, location
+    - Date filters: date_from, date_to for date range
+    - Category filter: filter by event category
     """
     try:
         # Get the current user from JWT token
         jwt_data = get_jwt()
         user_id = jwt_data.get('user_id')
         user = User.query.get(user_id)
-        
+
         if not user:
             return jsonify({"error": "User not found"}), 404
 
@@ -154,6 +180,12 @@ def get_events():
         filter_type = request.args.get('filter', 'public')  # Default to public events
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
+
+        # Search, date, and category filter parameters
+        search = request.args.get('search', '').strip()
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+        category = request.args.get('category')
 
         # Validate limit
         if limit > 100:
@@ -182,6 +214,42 @@ def get_events():
             return jsonify({
                 "error": "Invalid filter type. Valid options: 'public', 'my_org', 'all'"
             }), 400
+
+        # Apply search filter
+        if search:
+            search_term = f"%{search}%"
+            from sqlalchemy import or_
+            events_query = events_query.filter(
+                or_(
+                    Event.title.ilike(search_term),
+                    Event.description.ilike(search_term),
+                    Event.location.ilike(search_term)
+                )
+            )
+
+        # Apply date range filters
+        if date_from:
+            try:
+                parsed_date_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+                events_query = events_query.filter(Event.date >= parsed_date_from)
+            except ValueError:
+                return jsonify({"error": "Invalid date_from format. Use YYYY-MM-DD"}), 400
+
+        if date_to:
+            try:
+                parsed_date_to = datetime.strptime(date_to, "%Y-%m-%d").date()
+                events_query = events_query.filter(Event.date <= parsed_date_to)
+            except ValueError:
+                return jsonify({"error": "Invalid date_to format. Use YYYY-MM-DD"}), 400
+
+        # Apply category filter
+        if category:
+            valid_categories = [c.value for c in EventCategory]
+            if category not in valid_categories:
+                return jsonify({
+                    "error": f"Invalid category. Valid options: {', '.join(valid_categories)}"
+                }), 400
+            events_query = events_query.filter(Event.category == category)
 
         # Apply pagination
         events = events_query.order_by(Event.date.asc(), Event.time.asc()).offset(offset).limit(limit).all()
@@ -219,6 +287,10 @@ def get_events():
         return jsonify({
             "message": "Events retrieved successfully",
             "filter": filter_type,
+            "search": search if search else None,
+            "date_from": date_from if date_from else None,
+            "date_to": date_to if date_to else None,
+            "category": category if category else None,
             "total_count": total_count,
             "returned_count": len(events_data),
             "pagination": {
@@ -383,6 +455,15 @@ def update_event(event_id):
 
         if 'is_public' in data:
             event.is_public = bool(data['is_public'])
+
+        if 'category' in data:
+            category = data['category']
+            valid_categories = [c.value for c in EventCategory]
+            if category not in valid_categories:
+                return jsonify({
+                    "error": f"Invalid category. Valid options: {', '.join(valid_categories)}"
+                }), 400
+            event.category = category
 
         # Update the updated_at timestamp
         event.updated_at = datetime.now()

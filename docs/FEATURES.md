@@ -9,9 +9,16 @@ This document tracks all features - completed, in progress, and planned.
 | Category | Completed | Total | Progress |
 |----------|:---------:|:-----:|:--------:|
 | Core MVP | 18 | 18 | 100% |
-| Expected Features | 12 | 26 | 46% |
+| Expected Features | 16 | 26 | 62% |
 | Nice-to-Have | 1 | 9 | 11% |
-| **Overall** | **31** | **53** | **58%** |
+| **Overall** | **35** | **53** | **66%** |
+
+> **Recent Updates:**
+> - Event Categories: Tag events as Conference, Meetup, Workshop, Social, Networking, Webinar, or Other
+> - Event Search: Search by title, description, location with debounced input
+> - Event Date Filters: Filter by date range with quick filters (Today, This Week, This Month)
+> - AI Chat converted to floating widget (bottom-right corner)
+> - Team members can now view organization details (read-only)
 
 ---
 
@@ -67,7 +74,11 @@ This document tracks all features - completed, in progress, and planned.
 | 24 | Email Notifications | SendGrid integration | `utils/email_helpers.py` |
 | 25 | Redux State Management | Auth, events, org slices | `lib/redux/` |
 | 26 | Database Migrations | Alembic setup | `migrations/` |
-| 27 | AI Chat Assistant | Groq API integration | `routes/chat/routes.py` |
+| 27 | AI Chat Widget | Floating chat widget with Groq API | `components/ChatWidget.tsx`, `routes/chat/routes.py` |
+| 28 | Team Member Access | Team members can view org details (read-only) | `routes/organizations/routes.py` |
+| 29 | Event Search | Search events by title, description, location | `routes/events/routes.py`, `app/events/page.tsx` |
+| 30 | Event Date Filters | Filter events by date range with quick filters | `routes/events/routes.py`, `app/events/page.tsx` |
+| 31 | Event Categories | Tag events with categories (Conference, Meetup, Workshop, etc.) | `routes/events/routes.py`, `models.py`, `app/events/page.tsx` |
 
 ---
 
@@ -77,10 +88,10 @@ This document tracks all features - completed, in progress, and planned.
 
 | # | Feature | Description | Complexity | Priority |
 |---|---------|-------------|:----------:|:--------:|
-| 1 | Event Search | Search by title, description | Medium | P0 |
-| 2 | Event Filters | Filter by date range, location | Medium | P0 |
+| 1 | ~~Event Search~~ | ~~Search by title, description~~ | ~~Medium~~ | ✅ Done |
+| 2 | ~~Event Filters~~ | ~~Filter by date range, location~~ | ~~Medium~~ | ✅ Done |
 | 3 | Calendar View | Monthly/weekly calendar display | High | P0 |
-| 4 | Event Categories | Tags like conference, meetup, workshop | Low | P0 |
+| 4 | ~~Event Categories~~ | ~~Tags like conference, meetup, workshop~~ | ~~Low~~ | ✅ Done |
 | 5 | Event Capacity | Max attendees setting | Low | P0 |
 | 6 | User Profile Page | View/edit profile information | Low | P0 |
 | 7 | Attendee Check-in | Mark guests as checked in | Medium | P1 |
@@ -163,19 +174,26 @@ Analytics Dashboard
 
 ## Implementation Notes
 
-### Adding Event Categories
+### Event Categories (Implemented)
 
 ```python
-# models.py - Add EventCategory enum
-class EventCategory(enum.Enum):
+# models.py - EventCategory enum (IMPLEMENTED)
+class EventCategory(Enum):
     CONFERENCE = "conference"
     MEETUP = "meetup"
     WORKSHOP = "workshop"
     SOCIAL = "social"
+    NETWORKING = "networking"
+    WEBINAR = "webinar"
     OTHER = "other"
 
-# Add to Event model
-category = db.Column(db.Enum(EventCategory), default=EventCategory.OTHER)
+# Event model includes:
+category = db.Column(db.String(50), default=EventCategory.OTHER.value)
+
+# Frontend includes:
+# - Category dropdown in create/edit forms
+# - Category filter chips on events list
+# - Category badges on event cards
 ```
 
 ### Adding Event Capacity

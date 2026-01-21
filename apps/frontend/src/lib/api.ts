@@ -91,6 +91,13 @@ export interface Invitation {
   };
 }
 
+export type EventCategory = 'conference' | 'meetup' | 'workshop' | 'social' | 'networking' | 'webinar' | 'other';
+
+export interface EventCategoryOption {
+  value: EventCategory;
+  label: string;
+}
+
 export interface Event {
   id: number;
   title: string;
@@ -99,6 +106,7 @@ export interface Event {
   time: string;
   location: string;
   is_public: boolean;
+  category: EventCategory;
   organization_id: number;
   user_id: number;
   created_at: string;
@@ -119,6 +127,7 @@ export interface CreateEventRequest {
   time: string;
   location: string;
   is_public?: boolean;
+  category?: EventCategory;
   organization_id?: number; // Required for admins, optional for organizers (uses their org)
 }
 
@@ -381,14 +390,30 @@ class ApiClient {
   }
 
   // Event endpoints
-  async getEvents(filter?: 'public' | 'my_org' | 'all', limit?: number, offset?: number): Promise<ApiResponse & { events: Event[], total_count: number }> {
+  async getEvents(options?: {
+    filter?: 'public' | 'my_org' | 'all';
+    limit?: number;
+    offset?: number;
+    search?: string;
+    date_from?: string;
+    date_to?: string;
+    category?: EventCategory;
+  }): Promise<ApiResponse & { events: Event[], total_count: number }> {
     const params = new URLSearchParams();
-    if (filter) params.append('filter', filter);
-    if (limit) params.append('limit', limit.toString());
-    if (offset) params.append('offset', offset.toString());
-    
+    if (options?.filter) params.append('filter', options.filter);
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.offset) params.append('offset', options.offset.toString());
+    if (options?.search) params.append('search', options.search);
+    if (options?.date_from) params.append('date_from', options.date_from);
+    if (options?.date_to) params.append('date_to', options.date_to);
+    if (options?.category) params.append('category', options.category);
+
     const queryString = params.toString();
     return this.request(`/api/events${queryString ? '?' + queryString : ''}`);
+  }
+
+  async getCategories(): Promise<ApiResponse & { categories: EventCategoryOption[] }> {
+    return this.request('/api/events/categories');
   }
 
   async getEvent(eventId: number): Promise<ApiResponse & { event: Event }> {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,10 +12,21 @@ import { useReduxToast } from '@/hooks/useReduxToast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { fetchEvent, updateEvent } from '@/lib/redux/features/eventsSlice';
 import { createEventSchema, CreateEventFormData } from '@/lib/validations/auth';
-import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock, Save } from 'lucide-react';
+import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock, Save, Tag } from 'lucide-react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
+import { EventCategory } from '@/lib/api';
+
+const CATEGORY_OPTIONS: { value: EventCategory; label: string }[] = [
+  { value: 'conference', label: 'Conference' },
+  { value: 'meetup', label: 'Meetup' },
+  { value: 'workshop', label: 'Workshop' },
+  { value: 'social', label: 'Social' },
+  { value: 'networking', label: 'Networking' },
+  { value: 'webinar', label: 'Webinar' },
+  { value: 'other', label: 'Other' },
+];
 
 export default function EditEventPage() {
   const { success, error: errorToast } = useReduxToast();
@@ -23,8 +34,10 @@ export default function EditEventPage() {
   const params = useParams();
   const dispatch = useAppDispatch();
   const { user } = useReduxAuth();
-  const { currentEvent, isLoading, isUpdating, error } = useAppSelector((state) => state.events);
-  
+  const { currentEvent, isLoading, error } = useAppSelector((state) => state.events);
+  const [selectedCategory, setSelectedCategory] = useState<EventCategory>('other');
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const eventId = parseInt(params.id as string);
 
   const {
@@ -45,7 +58,8 @@ export default function EditEventPage() {
     },
   });
 
-  const isPublic = watch('is_public');
+  // Watch is_public for visual feedback if needed
+  watch('is_public');
 
   // Fetch event data and populate form
   useEffect(() => {
@@ -65,6 +79,7 @@ export default function EditEventPage() {
         location: currentEvent.location,
         is_public: currentEvent.is_public,
       });
+      setSelectedCategory(currentEvent.category || 'other');
     }
   }, [currentEvent, eventId, reset]);
 
@@ -75,25 +90,29 @@ export default function EditEventPage() {
 
   const onSubmit = async (data: CreateEventFormData) => {
     if (!currentEvent) return;
-    
+
+    setIsUpdating(true);
     try {
       const result = await dispatch(updateEvent({
         eventId: currentEvent.id,
-        eventData: {
+        data: {
           title: data.title,
           description: data.description || undefined,
           date: data.date,
           time: data.time,
           location: data.location,
           is_public: data.is_public,
+          category: selectedCategory,
         }
       })).unwrap();
 
-      success('Event Updated', `${result.event.title} has been updated successfully!`);
+      success('Event Updated', `${result.title} has been updated successfully!`);
       router.push(`/events/${currentEvent.id}`);
-    } catch (error) {
-      const message = typeof error === 'string' ? error : 'Failed to update event';
+    } catch (err) {
+      const message = typeof err === 'string' ? err : 'Failed to update event';
       errorToast('Update Failed', message);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -275,6 +294,29 @@ export default function EditEventPage() {
                   {errors.location && (
                     <p className="text-sm text-red-500">{errors.location.message}</p>
                   )}
+                </div>
+
+                {/* Category */}
+                <div className="space-y-2">
+                  <Label htmlFor="category" className="flex items-center gap-2">
+                    <Tag className="h-4 w-4" />
+                    Category
+                  </Label>
+                  <select
+                    id="category"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value as EventCategory)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {CATEGORY_OPTIONS.map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Select a category to help attendees discover your event
+                  </p>
                 </div>
 
                 {/* Visibility */}

@@ -4,39 +4,133 @@ import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
-import { fetchEvents, setCurrentFilter } from '@/lib/redux/features/eventsSlice';
-import { Calendar, Search, Filter, Plus, Eye, MapPin, Clock, Building2, User, Mail, UserPlus } from 'lucide-react';
+import { fetchEvents, setCurrentFilter, setCategoryFilter, clearFilters } from '@/lib/redux/features/eventsSlice';
+import { Calendar, Search, Filter, Plus, Eye, MapPin, Clock, Building2, User, Mail, UserPlus, X, CalendarDays, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useReduxToast } from '@/hooks/useReduxToast';
-import { apiClient } from '@/lib/api';
+import { apiClient, EventCategory } from '@/lib/api';
+
+const CATEGORY_OPTIONS: { value: EventCategory; label: string; color: string }[] = [
+  { value: 'conference', label: 'Conference', color: 'bg-purple-100 text-purple-700' },
+  { value: 'meetup', label: 'Meetup', color: 'bg-blue-100 text-blue-700' },
+  { value: 'workshop', label: 'Workshop', color: 'bg-green-100 text-green-700' },
+  { value: 'social', label: 'Social', color: 'bg-pink-100 text-pink-700' },
+  { value: 'networking', label: 'Networking', color: 'bg-orange-100 text-orange-700' },
+  { value: 'webinar', label: 'Webinar', color: 'bg-cyan-100 text-cyan-700' },
+  { value: 'other', label: 'Other', color: 'bg-gray-100 text-gray-700' },
+];
 
 export default function EventsPage() {
   const { user } = useReduxAuth();
   const dispatch = useAppDispatch();
-  const { events, isLoading, error, currentFilter, totalCount } = useAppSelector((state) => state.events);
+  const { events, isLoading, error, currentFilter, totalCount, searchQuery, dateFrom, dateTo, categoryFilter } = useAppSelector((state) => state.events);
   const { success, error: errorToast } = useReduxToast();
-  
+
+  // Search and filter state
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+  const [localDateFrom, setLocalDateFrom] = useState(dateFrom || '');
+  const [localDateTo, setLocalDateTo] = useState(dateTo || '');
+  const [localCategory, setLocalCategory] = useState<EventCategory | null>(categoryFilter);
+
   // Invite modal state
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<{ id: number; title: string; date: string; time: string; location: string } | null>(null);
   const [guestEmails, setGuestEmails] = useState('');
   const [isInviting, setIsInviting] = useState(false);
 
+  // Debounced search
   useEffect(() => {
-    dispatch(fetchEvents({ filter: currentFilter }));
-  }, [dispatch, currentFilter]);
+    const timer = setTimeout(() => {
+      if (localSearch !== searchQuery) {
+        dispatch(fetchEvents({
+          filter: currentFilter,
+          search: localSearch,
+          date_from: localDateFrom || undefined,
+          date_to: localDateTo || undefined,
+          category: localCategory || undefined,
+        }));
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearch, currentFilter, localDateFrom, localDateTo, localCategory, searchQuery, dispatch]);
+
+  // Initial fetch
+  useEffect(() => {
+    dispatch(fetchEvents({ filter: currentFilter, category: localCategory || undefined }));
+  }, [dispatch, currentFilter, localCategory]);
 
   const handleFilterChange = (filter: 'public' | 'my_org' | 'all') => {
     dispatch(setCurrentFilter(filter));
-    dispatch(fetchEvents({ filter }));
+    dispatch(fetchEvents({
+      filter,
+      search: localSearch,
+      date_from: localDateFrom || undefined,
+      date_to: localDateTo || undefined,
+      category: localCategory || undefined,
+    }));
   };
 
-  const handleInviteGuests = (event: any) => {
+  const handleCategoryChange = (category: EventCategory | null) => {
+    setLocalCategory(category);
+    dispatch(setCategoryFilter(category));
+    dispatch(fetchEvents({
+      filter: currentFilter,
+      search: localSearch,
+      date_from: localDateFrom || undefined,
+      date_to: localDateTo || undefined,
+      category: category || undefined,
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setLocalSearch('');
+    setLocalDateFrom('');
+    setLocalDateTo('');
+    setLocalCategory(null);
+    dispatch(clearFilters());
+    dispatch(fetchEvents({ filter: currentFilter }));
+  };
+
+  const hasActiveFilters = localSearch || localDateFrom || localDateTo || localCategory;
+
+  // Quick date filter helpers
+  const setQuickDateFilter = (type: 'today' | 'week' | 'month') => {
+    const today = new Date();
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+    const from = formatDate(today);
+    let to = '';
+
+    if (type === 'today') {
+      to = from;
+    } else if (type === 'week') {
+      const weekLater = new Date(today);
+      weekLater.setDate(today.getDate() + 7);
+      to = formatDate(weekLater);
+    } else if (type === 'month') {
+      const monthLater = new Date(today);
+      monthLater.setMonth(today.getMonth() + 1);
+      to = formatDate(monthLater);
+    }
+
+    setLocalDateFrom(from);
+    setLocalDateTo(to);
+    dispatch(fetchEvents({
+      filter: currentFilter,
+      search: localSearch,
+      date_from: from,
+      date_to: to,
+      category: localCategory || undefined,
+    }));
+  };
+
+  const handleInviteGuests = (event: { id: number; title: string; date: string; time: string; location: string }) => {
     setSelectedEvent(event);
     setGuestEmails('');
     setInviteModalOpen(true);
@@ -108,10 +202,127 @@ export default function EventsPage() {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <Button 
-                variant={currentFilter === 'public' ? 'default' : 'outline'} 
+          <CardContent className="space-y-4">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search events by title, description, or location..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {localSearch && (
+                <button
+                  onClick={() => {
+                    setLocalSearch('');
+                    dispatch(fetchEvents({
+                      filter: currentFilter,
+                      date_from: localDateFrom || undefined,
+                      date_to: localDateTo || undefined,
+                      category: localCategory || undefined,
+                    }));
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Date Filters */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Date:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={localDateFrom}
+                  onChange={(e) => {
+                    setLocalDateFrom(e.target.value);
+                    if (e.target.value || localDateTo) {
+                      dispatch(fetchEvents({
+                        filter: currentFilter,
+                        search: localSearch,
+                        date_from: e.target.value || undefined,
+                        date_to: localDateTo || undefined,
+                        category: localCategory || undefined,
+                      }));
+                    }
+                  }}
+                  className="w-36 h-9"
+                />
+                <span className="text-muted-foreground">to</span>
+                <Input
+                  type="date"
+                  value={localDateTo}
+                  onChange={(e) => {
+                    setLocalDateTo(e.target.value);
+                    if (localDateFrom || e.target.value) {
+                      dispatch(fetchEvents({
+                        filter: currentFilter,
+                        search: localSearch,
+                        date_from: localDateFrom || undefined,
+                        date_to: e.target.value || undefined,
+                        category: localCategory || undefined,
+                      }));
+                    }
+                  }}
+                  className="w-36 h-9"
+                />
+              </div>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" onClick={() => setQuickDateFilter('today')}>
+                  Today
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setQuickDateFilter('week')}>
+                  This Week
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setQuickDateFilter('month')}>
+                  This Month
+                </Button>
+              </div>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-muted-foreground">
+                  <X className="h-4 w-4 mr-1" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+
+            {/* Category Filters */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Category:</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <Button
+                  variant={localCategory === null ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleCategoryChange(null)}
+                >
+                  All
+                </Button>
+                {CATEGORY_OPTIONS.map((cat) => (
+                  <Button
+                    key={cat.value}
+                    variant={localCategory === cat.value ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleCategoryChange(cat.value)}
+                  >
+                    {cat.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Event Type Filters */}
+            <div className="flex gap-2 pt-2 border-t">
+              <Button
+                variant={currentFilter === 'public' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => handleFilterChange('public')}
               >
@@ -119,8 +330,8 @@ export default function EventsPage() {
                 Public Events
               </Button>
               {user?.organization_id && (
-                <Button 
-                  variant={currentFilter === 'my_org' ? 'default' : 'outline'} 
+                <Button
+                  variant={currentFilter === 'my_org' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => handleFilterChange('my_org')}
                 >
@@ -129,12 +340,12 @@ export default function EventsPage() {
                 </Button>
               )}
               {user?.role === 'admin' && (
-                <Button 
-                  variant={currentFilter === 'all' ? 'default' : 'outline'} 
+                <Button
+                  variant={currentFilter === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => handleFilterChange('all')}
                 >
-                  <Search className="h-4 w-4 mr-2" />
+                  <Eye className="h-4 w-4 mr-2" />
                   All Events
                 </Button>
               )}
@@ -212,12 +423,19 @@ export default function EventsPage() {
                         </div>
                         <div className="flex items-center gap-2 mt-2">
                           <span className={`text-xs px-2 py-1 rounded-full ${
-                            event.is_public 
-                              ? 'bg-green-100 text-green-700' 
+                            event.is_public
+                              ? 'bg-green-100 text-green-700'
                               : 'bg-blue-100 text-blue-700'
                           }`}>
                             {event.is_public ? 'Public' : 'Private'}
                           </span>
+                          {event.category && (
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              CATEGORY_OPTIONS.find(c => c.value === event.category)?.color || 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {CATEGORY_OPTIONS.find(c => c.value === event.category)?.label || event.category}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">

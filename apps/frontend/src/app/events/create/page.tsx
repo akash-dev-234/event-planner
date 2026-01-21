@@ -12,11 +12,21 @@ import { useReduxToast } from '@/hooks/useReduxToast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { createEvent } from '@/lib/redux/features/eventsSlice';
 import { createEventSchema, CreateEventFormData } from '@/lib/validations/auth';
-import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock, Building2 } from 'lucide-react';
+import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock, Building2, Tag } from 'lucide-react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
-import { apiClient, Organization } from '@/lib/api';
+import { apiClient, Organization, EventCategory } from '@/lib/api';
+
+const CATEGORY_OPTIONS: { value: EventCategory; label: string }[] = [
+  { value: 'conference', label: 'Conference' },
+  { value: 'meetup', label: 'Meetup' },
+  { value: 'workshop', label: 'Workshop' },
+  { value: 'social', label: 'Social' },
+  { value: 'networking', label: 'Networking' },
+  { value: 'webinar', label: 'Webinar' },
+  { value: 'other', label: 'Other' },
+];
 
 export default function CreateEventPage() {
   const { success, error: errorToast } = useReduxToast();
@@ -27,6 +37,7 @@ export default function CreateEventPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<EventCategory>('other');
 
   const isAdmin = user?.role === 'admin';
 
@@ -74,21 +85,18 @@ export default function CreateEventPage() {
     }
 
     try {
-      const eventData: Record<string, unknown> = {
+      const eventData = {
         title: data.title,
         description: data.description || undefined,
         date: data.date,
         time: data.time,
         location: data.location,
         is_public: data.is_public,
+        category: selectedCategory,
+        organization_id: isAdmin && selectedOrgId ? selectedOrgId : undefined,
       };
 
-      // Add organization_id for admin users
-      if (isAdmin && selectedOrgId) {
-        eventData.organization_id = selectedOrgId;
-      }
-
-      const result = await dispatch(createEvent(eventData as Parameters<typeof createEvent>[0])).unwrap();
+      const result = await dispatch(createEvent(eventData)).unwrap();
 
       success('Event Created', `${result.title} has been created successfully!`);
       router.push('/events');
@@ -264,6 +272,29 @@ export default function CreateEventPage() {
                   </p>
                 </div>
 
+                {/* Event Category */}
+                <div className="space-y-2">
+                  <Label htmlFor="category">Event Category</Label>
+                  <div className="relative">
+                    <Tag className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <select
+                      id="category"
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value as EventCategory)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      {CATEGORY_OPTIONS.map((cat) => (
+                        <option key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Select a category to help attendees discover your event
+                  </p>
+                </div>
+
                 {/* Event Visibility */}
                 <div className="space-y-4">
                   <Label>Event Visibility</Label>
@@ -365,11 +396,14 @@ export default function CreateEventPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`text-xs px-2 py-1 rounded-full ${
-                        isPublic 
-                          ? 'bg-green-100 text-green-700' 
+                        isPublic
+                          ? 'bg-green-100 text-green-700'
                           : 'bg-blue-100 text-blue-700'
                       }`}>
                         {isPublic ? 'Public' : 'Private'}
+                      </span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                        {CATEGORY_OPTIONS.find(c => c.value === selectedCategory)?.label || selectedCategory}
                       </span>
                     </div>
                   </div>

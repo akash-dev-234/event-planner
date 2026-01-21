@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { apiClient, Event, CreateEventRequest, ApiError } from '@/lib/api';
+import { apiClient, Event, CreateEventRequest, ApiError, EventCategory } from '@/lib/api';
 
 interface EventsState {
   events: Event[];
@@ -8,6 +8,10 @@ interface EventsState {
   isLoading: boolean;
   error: string | null;
   currentFilter: 'public' | 'my_org' | 'all';
+  searchQuery: string;
+  dateFrom: string | null;
+  dateTo: string | null;
+  categoryFilter: EventCategory | null;
   isCreating: boolean;
 }
 
@@ -18,23 +22,43 @@ const initialState: EventsState = {
   isLoading: false,
   error: null,
   currentFilter: 'public',
+  searchQuery: '',
+  dateFrom: null,
+  dateTo: null,
+  categoryFilter: null,
   isCreating: false,
 };
 
 // Async thunks
 export const fetchEvents = createAsyncThunk(
   'events/fetchEvents',
-  async ({ filter = 'public', limit = 50, offset = 0 }: { 
+  async ({ filter = 'public', limit = 50, offset = 0, search = '', date_from, date_to, category }: {
     filter?: 'public' | 'my_org' | 'all';
     limit?: number;
     offset?: number;
+    search?: string;
+    date_from?: string;
+    date_to?: string;
+    category?: EventCategory;
   } = {}, { rejectWithValue }) => {
     try {
-      const response = await apiClient.getEvents(filter, limit, offset);
+      const response = await apiClient.getEvents({
+        filter,
+        limit,
+        offset,
+        search: search || undefined,
+        date_from,
+        date_to,
+        category,
+      });
       return {
         events: response.events,
         totalCount: response.total_count,
         filter,
+        search,
+        date_from,
+        date_to,
+        category,
       };
     } catch (error) {
       if (error instanceof ApiError) {
@@ -115,6 +139,22 @@ const eventsSlice = createSlice({
     setCurrentFilter: (state, action: PayloadAction<'public' | 'my_org' | 'all'>) => {
       state.currentFilter = action.payload;
     },
+    setSearchQuery: (state, action: PayloadAction<string>) => {
+      state.searchQuery = action.payload;
+    },
+    setDateFilters: (state, action: PayloadAction<{ dateFrom: string | null; dateTo: string | null }>) => {
+      state.dateFrom = action.payload.dateFrom;
+      state.dateTo = action.payload.dateTo;
+    },
+    setCategoryFilter: (state, action: PayloadAction<EventCategory | null>) => {
+      state.categoryFilter = action.payload;
+    },
+    clearFilters: (state) => {
+      state.searchQuery = '';
+      state.dateFrom = null;
+      state.dateTo = null;
+      state.categoryFilter = null;
+    },
     clearCurrentEvent: (state) => {
       state.currentEvent = null;
     },
@@ -131,6 +171,10 @@ const eventsSlice = createSlice({
         state.events = action.payload.events;
         state.totalCount = action.payload.totalCount;
         state.currentFilter = action.payload.filter;
+        state.searchQuery = action.payload.search || '';
+        state.dateFrom = action.payload.date_from || null;
+        state.dateTo = action.payload.date_to || null;
+        state.categoryFilter = action.payload.category || null;
         state.error = null;
       })
       .addCase(fetchEvents.rejected, (state, action) => {
@@ -185,5 +229,5 @@ const eventsSlice = createSlice({
   },
 });
 
-export const { clearError, setCurrentFilter, clearCurrentEvent } = eventsSlice.actions;
+export const { clearError, setCurrentFilter, setSearchQuery, setDateFilters, setCategoryFilter, clearFilters, clearCurrentEvent } = eventsSlice.actions;
 export default eventsSlice.reducer;
