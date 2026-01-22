@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useReduxToast } from '@/hooks/useReduxToast';
 import { apiClient, Organization } from '@/lib/api';
-import { Building2, Trash2, RotateCcw, Loader2, Users, Calendar } from 'lucide-react';
+import { Building2, Trash2, RotateCcw, Loader2, Users, Calendar, Eye } from 'lucide-react';
+import Link from 'next/link';
 
 type FilterType = 'all' | 'active' | 'deleted';
 
@@ -204,6 +205,17 @@ export default function AdminOrganizationsPage() {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-end gap-2">
+                            {/* View Details button for all orgs */}
+                            <Link href={`/organizations/${org.id}`}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            </Link>
+
                             {org.is_deleted ? (
                               // Restore button for deleted orgs
                               <Button

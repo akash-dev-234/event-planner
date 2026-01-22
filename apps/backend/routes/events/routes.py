@@ -3,7 +3,7 @@ from datetime import datetime, date, time
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from decorators import admin_or_organizer_required, role_required
-from models import Event, Organization, User, UserRole, EventCategory
+from models import Event, Organization, User, UserRole, EventCategory, EventInvitation
 from extensions import db
 from utils.validators import is_non_empty_string, clean_string
 from . import events_bp as events
@@ -265,11 +265,11 @@ def get_events():
         events_data = []
         for event in events:
             event_dict = event.to_dict()
-            
+
             # Add organization name
             org = Organization.query.get(event.organization_id)
             event_dict['organization_name'] = org.name if org else "Unknown"
-            
+
             # Add organizer name
             organizer = User.query.get(event.user_id)
             if organizer:
@@ -277,7 +277,7 @@ def get_events():
                     'name': f"{organizer.first_name} {organizer.last_name}",
                     'email': organizer.email
                 }
-            
+
             # Add edit permissions
             can_edit = (
                 user.id == event.user_id or  # Event creator
@@ -285,7 +285,17 @@ def get_events():
                 user.role == UserRole.ADMIN.value  # Admin
             )
             event_dict['can_edit'] = can_edit
-            
+
+            # Add guest counts for organizers and admins
+            if can_edit:
+                invitations = EventInvitation.query.filter_by(event_id=event.id).all()
+                event_dict['guest_counts'] = {
+                    'total': len(invitations),
+                    'accepted': len([inv for inv in invitations if inv.status == 'accepted']),
+                    'declined': len([inv for inv in invitations if inv.status == 'declined']),
+                    'pending': len([inv for inv in invitations if inv.status == 'pending'])
+                }
+
             events_data.append(event_dict)
 
         return jsonify({
@@ -371,6 +381,28 @@ def get_event(event_id):
             user.role == UserRole.ADMIN.value  # Admin
         )
         event_data['can_edit'] = can_edit
+
+        # Add guest counts and list for organizers and admins
+        if can_edit:
+            invitations = EventInvitation.query.filter_by(event_id=event.id).all()
+            event_data['guest_counts'] = {
+                'total': len(invitations),
+                'accepted': len([inv for inv in invitations if inv.status == 'accepted']),
+                'declined': len([inv for inv in invitations if inv.status == 'declined']),
+                'pending': len([inv for inv in invitations if inv.status == 'pending'])
+            }
+            # Add detailed guest list
+            event_data['guests'] = [
+                {
+                    'id': inv.id,
+                    'email': inv.guest_email,
+                    'name': inv.guest_name,
+                    'status': inv.status,
+                    'invited_at': inv.created_at.isoformat() if inv.created_at else None,
+                    'responded_at': inv.responded_at.isoformat() if inv.responded_at else None
+                }
+                for inv in invitations
+            ]
 
         return jsonify({
             "message": "Event retrieved successfully",

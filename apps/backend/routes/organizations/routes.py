@@ -148,23 +148,23 @@ def invite_user_to_organization(org_id):
     """
     Invite a user to join an organization.
     Works for both registered and unregistered users.
-    Only organizers of the organization can send invites.
+    Admins can invite to any organization, organizers can invite to their own.
     """
     try:
         # Get the current user from JWT token
         jwt_data = get_jwt()
         user_id = jwt_data.get('user_id')
         inviter = User.query.get(user_id)
-        
+
         if not inviter:
             return jsonify({"error": "User not found"}), 404
 
-        # Check if the inviter is an organizer and belongs to this organization
-        if inviter.role != UserRole.ORGANIZER.value:
-            return jsonify({"error": "Only organizers can send invitations"}), 403
-            
-        if inviter.organization_id != org_id:
-            return jsonify({"error": "You can only invite users to your own organization"}), 403
+        # Check permissions: admins can invite to any org, organizers only their own
+        if inviter.role == UserRole.ORGANIZER.value:
+            if inviter.organization_id != org_id:
+                return jsonify({"error": "You can only invite users to your own organization"}), 403
+        elif inviter.role != UserRole.ADMIN.value:
+            return jsonify({"error": "Only organizers and admins can send invitations"}), 403
 
         # Get request data
         data = request.get_json()
@@ -828,23 +828,24 @@ def change_member_role(org_id, member_id):
 def get_organization_invitations(org_id):
     """
     Get all pending invitations for an organization.
-    Only organizers can view pending invitations.
+    Admins can view any organization's invitations.
+    Organizers can view their own organization's invitations.
     """
     try:
         # Get the current user from JWT token
         jwt_data = get_jwt()
         user_id = jwt_data.get('user_id')
         user = User.query.get(user_id)
-        
+
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        # Check if the user is an organizer and belongs to this organization
-        if user.role != UserRole.ORGANIZER.value:
-            return jsonify({"error": "Only organizers can view invitations"}), 403
-            
-        if user.organization_id != org_id:
-            return jsonify({"error": "You can only view invitations for your own organization"}), 403
+        # Check permissions: admins can view any org, organizers only their own
+        if user.role == UserRole.ORGANIZER.value:
+            if user.organization_id != org_id:
+                return jsonify({"error": "You can only view invitations for your own organization"}), 403
+        elif user.role != UserRole.ADMIN.value:
+            return jsonify({"error": "Only organizers and admins can view invitations"}), 403
 
         # Get the organization
         organization = Organization.query.get(org_id)

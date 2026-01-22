@@ -118,6 +118,20 @@ export interface Event {
     email: string;
   };
   can_edit?: boolean;
+  guest_counts?: {
+    total: number;
+    accepted: number;
+    declined: number;
+    pending: number;
+  };
+  guests?: Array<{
+    id: number;
+    email: string;
+    name: string;
+    status: 'pending' | 'accepted' | 'declined';
+    invited_at: string | null;
+    responded_at: string | null;
+  }>;
 }
 
 export interface CreateEventRequest {

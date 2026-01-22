@@ -37,10 +37,15 @@ export default function OrganizationInvitationsPage() {
   const dispatch = useAppDispatch();
   const { user } = useReduxAuth();
   const { success, error: errorToast } = useReduxToast();
-  
-  const { currentOrganization, isInviting } = useAppSelector(
+
+  const { isInviting } = useAppSelector(
     (state) => state.organization
   );
+
+  // For admins, get organization ID from URL parameter
+  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const orgIdParam = searchParams.get('orgId');
+  const organizationId = user?.role === 'admin' && orgIdParam ? parseInt(orgIdParam) : user?.organization_id;
 
   const {
     register,
@@ -56,11 +61,11 @@ export default function OrganizationInvitationsPage() {
   });
 
   const loadPendingInvitations = async () => {
-    if (!user?.organization_id) return;
-    
+    if (!organizationId) return;
+
     setIsLoadingInvitations(true);
     try {
-      const response = await apiClient.getOrganizationInvitations(user.organization_id);
+      const response = await apiClient.getOrganizationInvitations(organizationId);
       setPendingInvitations(response.invitations || []);
     } catch (error) {
       console.error('Failed to load invitations:', error);
@@ -72,12 +77,12 @@ export default function OrganizationInvitationsPage() {
   };
 
   useEffect(() => {
-    if (user?.organization_id) {
+    if (organizationId) {
       loadPendingInvitations();
     } else {
       setIsLoading(false);
     }
-  }, [user?.organization_id]);
+  }, [organizationId]);
 
   if (!user) {
     return (
@@ -89,7 +94,7 @@ export default function OrganizationInvitationsPage() {
     );
   }
 
-  if (user.role !== 'organizer') {
+  if (user.role !== 'organizer' && user.role !== 'admin') {
     return (
       <DashboardLayout>
         <div className="max-w-2xl mx-auto">
@@ -98,7 +103,7 @@ export default function OrganizationInvitationsPage() {
               <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
               <CardTitle>Access Denied</CardTitle>
               <CardDescription>
-                Only organizers can manage organization invitations.
+                Only organizers and admins can manage organization invitations.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
@@ -112,7 +117,7 @@ export default function OrganizationInvitationsPage() {
     );
   }
 
-  if (!user.organization_id) {
+  if (!organizationId) {
     return (
       <DashboardLayout>
         <div className="max-w-2xl mx-auto">
@@ -121,12 +126,14 @@ export default function OrganizationInvitationsPage() {
               <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <CardTitle>No Organization</CardTitle>
               <CardDescription>
-                You need to create or join an organization first.
+                {user?.role === 'admin'
+                  ? 'Please select an organization from the admin panel to manage invitations.'
+                  : 'You need to create or join an organization first.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
-              <Button onClick={() => router.push('/organizations/create')}>
-                Create Organization
+              <Button onClick={() => router.push(user?.role === 'admin' ? '/admin/organizations' : '/organizations/create')}>
+                {user?.role === 'admin' ? 'View Organizations' : 'Create Organization'}
               </Button>
             </CardContent>
           </Card>
@@ -136,12 +143,12 @@ export default function OrganizationInvitationsPage() {
   }
 
   const onSubmit = async (data: InviteUserFormData) => {
-    if (!user.organization_id) return;
+    if (!organizationId) return;
 
     try {
-      await dispatch(inviteUserToOrganization({ 
-        orgId: user.organization_id, 
-        data 
+      await dispatch(inviteUserToOrganization({
+        orgId: organizationId,
+        data
       })).unwrap();
       
       success('Invitation Sent!', `Invitation sent to ${data.email}`);

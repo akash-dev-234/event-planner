@@ -3,7 +3,6 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 import requests
 import re
 import os
-from decorators import organization_member_required
 
 from . import chat_bp
 from utils.validators import sanitize_input
@@ -50,7 +49,6 @@ def filter_response(response_text):
 
 @chat_bp.route('/message', methods=['POST'])
 @jwt_required()
-@organization_member_required
 def chat_message():
     try:
         data = request.get_json()

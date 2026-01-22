@@ -11,18 +11,23 @@ import { useReduxToast } from '@/hooks/useReduxToast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { fetchEvent, deleteEvent } from '@/lib/redux/features/eventsSlice';
 import DashboardLayout from '@/components/DashboardLayout';
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Globe, 
-  Lock, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Globe,
+  Lock,
   ArrowLeft,
   Edit,
   Trash2,
   Share2,
   Building2,
-  User
+  User,
+  Users,
+  Mail,
+  CheckCircle2,
+  XCircle,
+  Clock as ClockPending
 } from 'lucide-react';
 
 export default function EventDetailsPage() {
@@ -108,17 +113,25 @@ export default function EventDetailsPage() {
     }
   };
 
-  const handleShareEvent = () => {
+  const handleShareEvent = async () => {
     const url = window.location.href;
-    if (navigator.share) {
-      navigator.share({
-        title: currentEvent.title,
-        text: currentEvent.description || 'Check out this event!',
-        url: url,
-      });
-    } else {
-      navigator.clipboard.writeText(url);
-      success('Link Copied', 'Event link copied to clipboard!');
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: currentEvent.title,
+          text: currentEvent.description || 'Check out this event!',
+          url: url,
+        });
+        success('Shared!', 'Event shared successfully!');
+      } else {
+        await navigator.clipboard.writeText(url);
+        success('Link Copied', 'Event link copied to clipboard!');
+      }
+    } catch (error) {
+      // User cancelled or error occurred
+      if ((error as Error).name !== 'AbortError') {
+        errorToast('Share Failed', 'Could not share the event link');
+      }
     }
   };
 
@@ -143,55 +156,18 @@ export default function EventDetailsPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/events')}
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Events
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleShareEvent}
-            >
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
-            
-            {canEdit && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/events/${currentEvent.id}/edit`)}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowDeleteDialog(true)}
-                  disabled={isDeleting}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </Button>
-              </>
-            )}
-          </div>
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/events')}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Events
+          </Button>
         </div>
 
         {/* Event Header */}
@@ -278,6 +254,120 @@ export default function EventDetailsPage() {
                       <p className="text-sm text-muted-foreground">Organization</p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Guest List - Only visible to organizers and admins */}
+            {canEdit && currentEvent.guest_counts && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Guest List
+                  </CardTitle>
+                  <CardDescription>
+                    Invitations sent and responses for this event
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                        <span className="text-xs font-medium text-emerald-700">Accepted</span>
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-900">
+                        {currentEvent.guest_counts.accepted}
+                      </p>
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <ClockPending className="h-4 w-4 text-amber-700" />
+                        <span className="text-xs font-medium text-amber-700">Pending</span>
+                      </div>
+                      <p className="text-2xl font-bold text-amber-900">
+                        {currentEvent.guest_counts.pending}
+                      </p>
+                    </div>
+
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <XCircle className="h-4 w-4 text-red-700" />
+                        <span className="text-xs font-medium text-red-700">Declined</span>
+                      </div>
+                      <p className="text-2xl font-bold text-red-900">
+                        {currentEvent.guest_counts.declined}
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Mail className="h-4 w-4 text-slate-700" />
+                        <span className="text-xs font-medium text-slate-700">Total</span>
+                      </div>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {currentEvent.guest_counts.total}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Guest List Table */}
+                  {currentEvent.guests && currentEvent.guests.length > 0 ? (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="max-h-96 overflow-y-auto">
+                        <table className="w-full">
+                          <thead className="bg-muted sticky top-0">
+                            <tr>
+                              <th className="text-left p-2 text-xs font-medium">Guest</th>
+                              <th className="text-left p-2 text-xs font-medium">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {currentEvent.guests.map((guest) => (
+                              <tr key={guest.id} className="hover:bg-muted/50">
+                                <td className="p-2">
+                                  <div>
+                                    <p className="text-sm font-medium">{guest.email}</p>
+                                    {guest.name && (
+                                      <p className="text-xs text-muted-foreground">{guest.name}</p>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-2">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 ${
+                                      guest.status === 'accepted'
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : guest.status === 'declined'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-amber-100 text-amber-700'
+                                    }`}
+                                  >
+                                    {guest.status === 'accepted' && (
+                                      <CheckCircle2 className="h-3 w-3" />
+                                    )}
+                                    {guest.status === 'declined' && <XCircle className="h-3 w-3" />}
+                                    {guest.status === 'pending' && (
+                                      <ClockPending className="h-3 w-3" />
+                                    )}
+                                    {guest.status.charAt(0).toUpperCase() + guest.status.slice(1)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 border border-dashed rounded-lg">
+                      <Mail className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No guests invited yet</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

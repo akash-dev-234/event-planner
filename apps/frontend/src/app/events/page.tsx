@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { fetchEvents, setCurrentFilter, setCategoryFilter, clearFilters } from '@/lib/redux/features/eventsSlice';
-import { Calendar, Search, Filter, Plus, Eye, MapPin, Clock, Building2, User, Mail, UserPlus, X, CalendarDays, Tag } from 'lucide-react';
+import { Calendar, Search, Filter, Plus, Eye, MapPin, Clock, Building2, User, Mail, UserPlus, X, CalendarDays, Tag, Users, CheckCircle2, XCircle, Clock as ClockPending } from 'lucide-react';
 import Link from 'next/link';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useReduxToast } from '@/hooks/useReduxToast';
@@ -432,7 +432,7 @@ export default function EventsPage() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <span className={`text-xs px-2 py-1 rounded-full ${
                             event.is_public
                               ? 'bg-green-100 text-green-700'
@@ -446,6 +446,26 @@ export default function EventsPage() {
                             }`}>
                               {CATEGORY_OPTIONS.find(c => c.value === event.category)?.label || event.category}
                             </span>
+                          )}
+                          {event.guest_counts && event.can_edit && event.guest_counts.total > 0 && (
+                            <div className="flex items-center gap-1 ml-2">
+                              <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                {event.guest_counts.accepted}
+                              </span>
+                              <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                                <ClockPending className="h-3 w-3" />
+                                {event.guest_counts.pending}
+                              </span>
+                              <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 flex items-center gap-1">
+                                <XCircle className="h-3 w-3" />
+                                {event.guest_counts.declined}
+                              </span>
+                              <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700 flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {event.guest_counts.total}
+                              </span>
+                            </div>
                           )}
                         </div>
                       </div>
