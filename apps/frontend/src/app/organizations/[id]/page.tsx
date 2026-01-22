@@ -17,7 +17,6 @@ import {
   Edit,
   Trash2,
   UserPlus,
-  Mail,
   Shield,
   User,
 } from 'lucide-react';
@@ -100,7 +99,7 @@ export default function OrganizationDetailPage({ params }: { params: Promise<{ i
               <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Organization Not Found</h3>
               <p className="text-muted-foreground mb-4">
-                The organization you're looking for doesn't exist or you don't have permission to view it.
+                The organization you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.
               </p>
               <Button onClick={() => router.push('/organizations')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -306,7 +305,7 @@ export default function OrganizationDetailPage({ params }: { params: Promise<{ i
                 Delete Organization
               </DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete "{organization?.name}"? This action cannot be undone
+                Are you sure you want to delete &quot;{organization?.name}&quot;? This action cannot be undone
                 and will remove all associated data.
               </DialogDescription>
             </DialogHeader>

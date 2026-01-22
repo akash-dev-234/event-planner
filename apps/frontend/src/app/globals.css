@@ -110,3 +110,24 @@
     @apply relative bg-background px-2 text-muted-foreground;
   }
 }
+
+@layer utilities {
+  /* Pulse animation for landing page glowing orbs */
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+
+  /* Mobile performance optimizations */
+  @media (max-width: 768px) {
+    .animate-pulse {
+      will-change: opacity;
+    }
+  }
+
+  /* Reduce motion for accessibility and performance */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse {
+      animation: none;
+    }
+  }
+}
