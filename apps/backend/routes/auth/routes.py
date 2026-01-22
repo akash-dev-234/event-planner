@@ -8,7 +8,7 @@ from . import auth_bp as auth
 from decorators import role_required
 from models import Organization, User, UserRole, OrganizationInvitation
 from extensions import db, mail, bcrypt
-from utils.validators import is_valid_email, is_strong_password
+from utils.validators import is_valid_email, is_strong_password, is_non_empty_string, clean_string
 from utils.email_helpers import notify_admins_organizer_request, notify_user_organizer_approval
 
 
@@ -17,16 +17,24 @@ def register():
     if request.method == "POST":
         try:
             data = request.get_json()
-            first_name = data["first_name"]
-            last_name = data["last_name"]
-            email = data["email"]
-            password = data["password"]
+            first_name = clean_string(data.get("first_name", ""))
+            last_name = clean_string(data.get("last_name", ""))
+            email = clean_string(data.get("email", ""))
+            password = data.get("password", "")
             requested_role = data.get("role", "guest")  # Default to guest if not specified
-            
-        except KeyError as e:
-            return jsonify({"error": f"Missing form field: {str(e)}"}), 400
+
         except TypeError:
             return jsonify({"error": "Invalid JSON data"}), 400
+
+        # Validate required fields (reject empty or whitespace-only)
+        if not first_name:
+            return jsonify({"error": "First name is required"}), 400
+        if not last_name:
+            return jsonify({"error": "Last name is required"}), 400
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+        if not password:
+            return jsonify({"error": "Password is required"}), 400
 
         # Validate email format
         if not is_valid_email(email):
@@ -597,6 +605,10 @@ def delete_account():
         user_name = user.first_name
         user_email_address = user.email
 
+        # Delete events created by this user before deleting the user
+        from models import Event
+        Event.query.filter_by(user_id=user.id).delete()
+
         # If user is an organizer with an organization, handle cleanup
         if user.organization_id and user.role == UserRole.ORGANIZER.value:
             org = Organization.query.get(user.organization_id)
@@ -1157,11 +1169,9 @@ def admin_delete_user(user_id):
             'role': target_user.role
         }
 
-        # Handle events created by this user - soft delete them
+        # Delete events created by this user
         from models import Event
-        user_events = Event.query.filter_by(user_id=target_user.id).all()
-        for event in user_events:
-            event.soft_delete()
+        Event.query.filter_by(user_id=target_user.id).delete()
 
         # Handle organization cleanup if user is organizer
         if target_user.organization_id and target_user.role == UserRole.ORGANIZER.value:

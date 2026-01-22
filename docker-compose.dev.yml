@@ -15,8 +15,10 @@ services:
       - MAIL_SERVER=${MAIL_SERVER}
       - MAIL_PORT=${MAIL_PORT}
       - MAIL_USE_TLS=${MAIL_USE_TLS}
-      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAIL_USE_SSL=${MAIL_USE_SSL}
       - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - VERIFIED_EMAIL=${VERIFIED_EMAIL}
     volumes:
       - ./apps/backend:/app
       - backend_data:/app/instance

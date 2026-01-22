@@ -6,8 +6,9 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$
 export const loginSchema = z.object({
   email: z
     .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Email is required')
+    .refine(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), 'Please enter a valid email address'),
   password: z
     .string()
     .min(1, 'Password is required'),
@@ -16,18 +17,21 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   first_name: z
     .string()
-    .min(1, 'First name is required')
-    .min(2, 'First name must be at least 2 characters')
-    .max(50, 'First name must be less than 50 characters'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'First name is required')
+    .refine(val => val.length >= 2, 'First name must be at least 2 characters')
+    .refine(val => val.length <= 50, 'First name must be less than 50 characters'),
   last_name: z
     .string()
-    .min(1, 'Last name is required')
-    .min(2, 'Last name must be at least 2 characters')
-    .max(50, 'Last name must be less than 50 characters'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Last name is required')
+    .refine(val => val.length >= 2, 'Last name must be at least 2 characters')
+    .refine(val => val.length <= 50, 'Last name must be less than 50 characters'),
   email: z
     .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Email is required')
+    .refine(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), 'Please enter a valid email address'),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
@@ -43,8 +47,9 @@ export const registerSchema = z.object({
 export const forgotPasswordSchema = z.object({
   email: z
     .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Email is required')
+    .refine(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), 'Please enter a valid email address'),
 });
 
 export const resetPasswordSchema = z.object({
@@ -65,20 +70,23 @@ export const resetPasswordSchema = z.object({
 export const createOrganizationSchema = z.object({
   name: z
     .string()
-    .min(1, 'Organization name is required')
-    .min(3, 'Organization name must be at least 3 characters')
-    .max(100, 'Organization name must be less than 100 characters'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Organization name is required')
+    .refine(val => val.length >= 3, 'Organization name must be at least 3 characters')
+    .refine(val => val.length <= 100, 'Organization name must be less than 100 characters'),
   description: z
     .string()
-    .max(500, 'Description must be less than 500 characters')
+    .transform(val => val.trim())
+    .refine(val => val.length <= 500, 'Description must be less than 500 characters')
     .optional(),
 });
 
 export const inviteUserSchema = z.object({
   email: z
     .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Email is required')
+    .refine(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), 'Please enter a valid email address'),
   role: z.enum(['guest', 'team_member'], {
     required_error: 'Please select a role',
   }),
@@ -88,16 +96,19 @@ export const inviteUserSchema = z.object({
 export const createEventSchema = z.object({
   title: z
     .string()
-    .min(1, 'Event title is required')
-    .min(3, 'Event title must be at least 3 characters')
-    .max(150, 'Event title must be less than 150 characters'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Event title is required')
+    .refine(val => val.length >= 3, 'Event title must be at least 3 characters')
+    .refine(val => val.length <= 150, 'Event title must be less than 150 characters'),
   description: z
     .string()
-    .max(1000, 'Description must be less than 1000 characters')
+    .transform(val => val.trim())
+    .refine(val => val.length <= 1000, 'Description must be less than 1000 characters')
     .optional(),
   date: z
     .string()
-    .min(1, 'Event date is required')
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Event date is required')
     .refine((date) => {
       const selectedDate = new Date(date);
       const today = new Date();
@@ -106,13 +117,15 @@ export const createEventSchema = z.object({
     }, 'Event date cannot be in the past'),
   time: z
     .string()
-    .min(1, 'Event time is required')
-    .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/, 'Invalid time format'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Event time is required')
+    .refine(val => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/.test(val), 'Invalid time format'),
   location: z
     .string()
-    .min(1, 'Event location is required')
-    .min(3, 'Event location must be at least 3 characters')
-    .max(200, 'Event location must be less than 200 characters'),
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, 'Event location is required')
+    .refine(val => val.length >= 3, 'Event location must be at least 3 characters')
+    .refine(val => val.length <= 200, 'Event location must be less than 200 characters'),
   is_public: z.boolean().default(false),
 });
 

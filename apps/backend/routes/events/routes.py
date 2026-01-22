@@ -5,6 +5,7 @@ from flask_jwt_extended import jwt_required, get_jwt
 from decorators import admin_or_organizer_required, role_required
 from models import Event, Organization, User, UserRole, EventCategory
 from extensions import db
+from utils.validators import is_non_empty_string, clean_string
 from . import events_bp as events
 
 
@@ -71,16 +72,16 @@ def create_event():
                     "error": "Organization not found or has been deleted"
                 }), 404
 
-        # Extract and validate required fields
-        title = data.get("title")
-        description = data.get("description")
-        event_date = data.get("date")
-        event_time = data.get("time")
-        location = data.get("location")
+        # Extract and clean required fields (trim whitespace)
+        title = clean_string(data.get("title"))
+        description = clean_string(data.get("description"))
+        event_date = clean_string(data.get("date"))
+        event_time = clean_string(data.get("time"))
+        location = clean_string(data.get("location"))
         is_public = data.get("is_public", False)
         category = data.get("category", EventCategory.OTHER.value)
 
-        # Validate required fields
+        # Validate required fields (reject empty or whitespace-only)
         required_fields = {
             "title": title,
             "date": event_date,
@@ -90,7 +91,7 @@ def create_event():
 
         for field_name, field_value in required_fields.items():
             if not field_value:
-                return jsonify({"error": f"Missing required field: {field_name}"}), 400
+                return jsonify({"error": f"{field_name.replace('_', ' ').title()} is required"}), 400
 
         # Validate and parse date
         try:

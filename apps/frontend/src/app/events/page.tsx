@@ -142,14 +142,25 @@ export default function EventsPage() {
       return;
     }
 
+    // Email validation regex - requires proper format with TLD of at least 2 chars
+    const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/;
+
+    // Parse emails from textarea (one per line or comma-separated)
+    const parsedEmails = guestEmails
+      .split(/[,\n]/)
+      .map(email => email.trim())
+      .filter(email => email.length > 0);
+
+    // Validate all emails
+    const invalidEmails = parsedEmails.filter(email => !emailRegex.test(email));
+    if (invalidEmails.length > 0) {
+      errorToast('Invalid Email(s)', `Please fix: ${invalidEmails.join(', ')}`);
+      return;
+    }
+
     setIsInviting(true);
     try {
-      // Parse emails from textarea (one per line or comma-separated)
-      const emailList = guestEmails
-        .split(/[,\n]/)
-        .map(email => email.trim())
-        .filter(email => email.length > 0)
-        .map(email => ({ email, name: '' })); // Optional name field empty for now
+      const emailList = parsedEmails.map(email => ({ email, name: '' }));
 
       const response = await apiClient.inviteGuestsToEvent(selectedEvent.id, emailList);
 

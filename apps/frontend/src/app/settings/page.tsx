@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,24 +36,46 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Update profile form values when user changes
-  useState(() => {
+  useEffect(() => {
     if (user) {
       setFirstName(user.first_name || '');
       setLastName(user.last_name || '');
       setEmail(user.email || '');
     }
-  });
+  }, [user]);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileLoading(true);
     setProfileMessage(null);
 
+    // Trim whitespace
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const trimmedEmail = email.trim();
+
+    // Validate required fields
+    if (!trimmedFirstName) {
+      setProfileMessage({ type: 'error', text: 'First name is required' });
+      setProfileLoading(false);
+      return;
+    }
+    if (!trimmedLastName) {
+      setProfileMessage({ type: 'error', text: 'Last name is required' });
+      setProfileLoading(false);
+      return;
+    }
+    if (!trimmedEmail) {
+      setProfileMessage({ type: 'error', text: 'Email is required' });
+      setProfileLoading(false);
+      return;
+    }
+
     try {
       const response = await apiClient.updateProfile({
-        first_name: firstName,
-        last_name: lastName,
-        email: email,
+        first_name: trimmedFirstName,
+        last_name: trimmedLastName,
+        email: trimmedEmail,
       });
 
       setProfileMessage({ type: 'success', text: response.message });
@@ -77,15 +99,37 @@ export default function SettingsPage() {
     setPasswordLoading(true);
     setPasswordMessage(null);
 
+    // Trim whitespace from passwords
+    const trimmedCurrentPassword = currentPassword.trim();
+    const trimmedNewPassword = newPassword.trim();
+    const trimmedConfirmPassword = confirmPassword.trim();
+
+    // Validate required fields
+    if (!trimmedCurrentPassword) {
+      setPasswordMessage({ type: 'error', text: 'Current password is required' });
+      setPasswordLoading(false);
+      return;
+    }
+    if (!trimmedNewPassword) {
+      setPasswordMessage({ type: 'error', text: 'New password is required' });
+      setPasswordLoading(false);
+      return;
+    }
+    if (!trimmedConfirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'Please confirm your new password' });
+      setPasswordLoading(false);
+      return;
+    }
+
     // Validate passwords match
-    if (newPassword !== confirmPassword) {
+    if (trimmedNewPassword !== trimmedConfirmPassword) {
       setPasswordMessage({ type: 'error', text: 'New passwords do not match' });
       setPasswordLoading(false);
       return;
     }
 
     try {
-      const response = await apiClient.changePassword(currentPassword, newPassword);
+      const response = await apiClient.changePassword(trimmedCurrentPassword, trimmedNewPassword);
       setPasswordMessage({ type: 'success', text: response.message });
 
       // Clear form
@@ -101,7 +145,9 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!deletePassword) {
+    const trimmedPassword = deletePassword.trim();
+
+    if (!trimmedPassword) {
       setDeleteMessage({ type: 'error', text: 'Please enter your password to confirm deletion' });
       return;
     }
@@ -110,7 +156,7 @@ export default function SettingsPage() {
     setDeleteMessage(null);
 
     try {
-      await apiClient.deleteAccount(deletePassword);
+      await apiClient.deleteAccount(trimmedPassword);
 
       // Logout and redirect
       logout();

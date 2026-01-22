@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useReduxToast } from '@/hooks/useReduxToast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
-import { fetchEvent, updateEvent } from '@/lib/redux/features/eventsSlice';
+import { fetchEvent, updateEvent, clearError } from '@/lib/redux/features/eventsSlice';
 import { createEventSchema, CreateEventFormData } from '@/lib/validations/auth';
 import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock, Save, Tag } from 'lucide-react';
 import Link from 'next/link';
@@ -60,6 +60,11 @@ export default function EditEventPage() {
 
   // Watch is_public for visual feedback if needed
   watch('is_public');
+
+  // Clear any stale errors on mount
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
 
   // Fetch event data and populate form
   useEffect(() => {

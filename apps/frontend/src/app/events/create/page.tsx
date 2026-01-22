@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useReduxToast } from '@/hooks/useReduxToast';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
-import { createEvent } from '@/lib/redux/features/eventsSlice';
+import { createEvent, clearError } from '@/lib/redux/features/eventsSlice';
 import { createEventSchema, CreateEventFormData } from '@/lib/validations/auth';
 import { Calendar, ArrowLeft, MapPin, Clock, Globe, Lock, Building2, Tag } from 'lucide-react';
 import Link from 'next/link';
@@ -40,6 +40,11 @@ export default function CreateEventPage() {
   const [selectedCategory, setSelectedCategory] = useState<EventCategory>('other');
 
   const isAdmin = user?.role === 'admin';
+
+  // Clear any stale errors on mount
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
 
   // Fetch organizations for admin users
   useEffect(() => {
