@@ -17,4 +17,4 @@ Flask-Bcrypt==1.0.1
 groq==0.11.0
 requests==2.31.0
 Flask-CORS==4.0.0
-psycopg2-binary==2.9.9
+psycopg[binary]==3.2.3
