@@ -38,14 +38,27 @@ def create_app():
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)    
     
     backend_dir = os.path.abspath(os.path.dirname(__file__))
-    
-    # Use absolute path for database
-    db_path = os.path.join(backend_dir, 'instance', 'database.db')
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "connect_args": {"timeout": 10}  # Increase timeout to 10 seconds
-    }
+
+    # Database configuration - use PostgreSQL if DATABASE_URL is set, otherwise SQLite
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        # Using PostgreSQL (Supabase or other)
+        app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+        app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "pool_pre_ping": True,  # Verify connections before using
+            "pool_recycle": 300,    # Recycle connections after 5 minutes
+        }
+        print(f"✅ Using PostgreSQL database")
+    else:
+        # Fallback to SQLite for local development
+        db_path = os.path.join(backend_dir, 'instance', 'database.db')
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+        app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "connect_args": {"timeout": 10}
+        }
+        print(f"⚠️  Using SQLite database (local development)")
     # Load the secret key from the environment variable
     app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY")
     app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER")
