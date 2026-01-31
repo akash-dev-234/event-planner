@@ -22,9 +22,20 @@ def create_app():
     app.config['DEBUG'] = True
     app.config['PROPAGATE_EXCEPTIONS'] = True
     
-    # Enable CORS for all routes - more permissive for development
-    CORS(app, 
-         origins=['http://localhost:3000', 'http://127.0.0.1:3000', 'http://frontend:3000'], 
+    # Enable CORS for all routes
+    allowed_origins = [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://frontend:3000'
+    ]
+
+    # Add frontend URL from environment (for Vercel deployment)
+    frontend_url = os.environ.get('FRONTEND_URL')
+    if frontend_url and frontend_url not in allowed_origins:
+        allowed_origins.append(frontend_url)
+
+    CORS(app,
+         origins=allowed_origins,
          supports_credentials=True,
          allow_headers=['Content-Type', 'Authorization'],
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
