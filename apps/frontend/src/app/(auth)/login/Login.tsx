@@ -26,6 +26,7 @@ export default function LoginForm() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -34,6 +35,11 @@ export default function LoginForm() {
       password: '',
     },
   });
+
+  const fillDemoCredentials = (email: string, password: string) => {
+    setValue('email', email);
+    setValue('password', password);
+  };
 
   const onSubmit = async (data: LoginFormData) => {
     try {
@@ -132,6 +138,40 @@ export default function LoginForm() {
               >
                 Forgot password?
               </Link>
+            </div>
+
+            {/* Demo Credentials Quick Fill */}
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-muted">
+              <p className="text-xs font-medium text-muted-foreground">Quick Fill Demo Credentials:</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => fillDemoCredentials('eventplanner@yopmail.com', 'AdminPass123@')}
+                >
+                  Admin
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => fillDemoCredentials('john.doe@techinnovators.com', 'OrganizerPass123@')}
+                >
+                  Organizer
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => fillDemoCredentials('guest1@example.com', 'GuestPass123@')}
+                >
+                  Guest
+                </Button>
+              </div>
             </div>
 
             <Button
