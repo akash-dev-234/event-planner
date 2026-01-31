@@ -10,9 +10,11 @@ from models import Organization, User, UserRole, OrganizationInvitation
 from extensions import db, mail, bcrypt
 from utils.validators import is_valid_email, is_strong_password, is_non_empty_string, clean_string
 from utils.email_helpers import notify_admins_organizer_request, notify_user_organizer_approval
+from utils.rate_limiter import password_reset_rate_limit, email_rate_limit, registration_rate_limit, login_rate_limit
 
 
 @auth.route("/register", methods=["GET", "POST"])
+@registration_rate_limit
 def register():
     if request.method == "POST":
         try:
@@ -152,6 +154,7 @@ def register():
 
 
 @auth.route("/login", methods=["GET", "POST"])
+@login_rate_limit
 def login():
     if request.method == "POST":
         data = request.get_json()
@@ -219,6 +222,7 @@ def login():
 
 
 @auth.route("/forgot-password", methods=["POST"])
+@password_reset_rate_limit
 def forgot_password():
     print("Forgot password route hit")
     data = request.get_json()

@@ -6,6 +6,7 @@ import os
 
 from . import chat_bp
 from utils.validators import sanitize_input
+from utils.rate_limiter import chat_rate_limit
 
 GROQ_API_KEY = os.environ.get('GROK_API_KEY')  # Using same env var name
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -49,6 +50,7 @@ def filter_response(response_text):
 
 @chat_bp.route('/message', methods=['POST'])
 @jwt_required()
+@chat_rate_limit
 def chat_message():
     try:
         data = request.get_json()

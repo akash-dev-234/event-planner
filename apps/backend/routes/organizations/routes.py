@@ -10,6 +10,7 @@ from models import Organization, User, UserRole, OrganizationInvitation
 from extensions import db
 from utils.validators import is_valid_email, is_non_empty_string, clean_string
 from utils.email_helpers import send_invitation_email, send_registration_invitation_email
+from utils.rate_limiter import invitation_rate_limit
 
 
 @organization.route("/create", methods=["POST"])
@@ -144,6 +145,7 @@ def get_all_organizations():
 
 @organization.route("/<int:org_id>/invite", methods=["POST"])
 @jwt_required()
+@invitation_rate_limit
 def invite_user_to_organization(org_id):
     """
     Invite a user to join an organization.

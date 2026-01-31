@@ -7,11 +7,13 @@ from decorators import role_required
 from models import Event, EventInvitation, User
 from extensions import db
 from utils.email_helpers import send_event_invitation_email
+from utils.rate_limiter import invitation_rate_limit
 
 
 @events_bp.route("/<int:event_id>/invite-guests", methods=["POST"])
 @jwt_required()
 @role_required("organizer", "admin")
+@invitation_rate_limit
 def invite_guests_to_event(event_id):
     """Send event invitations to external guests (no platform access)"""
     try:
