@@ -59,14 +59,18 @@ def create_app():
             database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
         elif database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql+psycopg://', 1)
+
+        # Add sslmode to URL if not present (required for Supabase)
+        if '?' not in database_url:
+            database_url += '?sslmode=require'
+        elif 'sslmode' not in database_url:
+            database_url += '&sslmode=require'
+
         app.config["SQLALCHEMY_DATABASE_URI"] = database_url
         app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
             "pool_pre_ping": True,  # Verify connections before using
             "pool_recycle": 300,    # Recycle connections after 5 minutes
-            "connect_args": {
-                "sslmode": "require"  # Ensure SSL for cloud databases
-            }
         }
         print(f"✅ Using PostgreSQL database")
     else:
