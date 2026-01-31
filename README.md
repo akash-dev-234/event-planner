@@ -4,7 +4,7 @@ A full-stack event planning application with AI-powered chatbot assistance built
 
 ## Live Demo
 
-- **Frontend**: [https://event-planner-frontend.vercel.app](https://event-planner-frontend.vercel.app)
+- **Frontend**: [https://event-planner-rose.vercel.app](https://event-planner-rose.vercel.app)
 - **Backend**: [https://event-planner-t35d.onrender.com](https://event-planner-t35d.onrender.com)
 
 ### Demo Credentials
@@ -20,7 +20,7 @@ A full-stack event planning application with AI-powered chatbot assistance built
 - Event Management (Create, Read, Update, Delete)
 - Organization Management with Role-based Access
 - AI-powered Chatbot using Groq API
-- Email Notifications via SendGrid
+- Email Notifications via Gmail SMTP
 - JWT Authentication
 - Guest Invitation System with RSVP
 - Docker Containerization
@@ -32,7 +32,7 @@ A full-stack event planning application with AI-powered chatbot assistance built
 - **Backend**: Flask (Python), SQLAlchemy, psycopg3
 - **Database**: PostgreSQL (Supabase)
 - **AI**: Groq API integration
-- **Email**: SendGrid
+- **Email**: Gmail SMTP
 - **Deployment**: Vercel (Frontend), Render (Backend), Supabase (Database)
 - **Build System**: Nx Monorepo
 
@@ -147,13 +147,13 @@ FLASK_SECRET_KEY=your-secret-key
 # JWT
 JWT_SECRET_KEY=your-jwt-secret
 
-# Email (SendGrid)
-MAIL_SERVER=smtp.sendgrid.net
+# Email (Gmail SMTP)
+MAIL_SERVER=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USE_TLS=True
-SENDGRID_API_KEY=your-sendgrid-api-key
-MAIL_USERNAME=apikey
-VERIFIED_EMAIL=your-verified-email@domain.com
+MAIL_USERNAME=your-gmail@gmail.com
+MAIL_PASSWORD=your-gmail-app-password
+VERIFIED_EMAIL=your-gmail@gmail.com
 
 # Groq AI API
 GROK_API_KEY=your-groq-api-key
