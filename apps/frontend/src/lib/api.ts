@@ -571,6 +571,32 @@ class ApiClient {
     return this.request(`/api/events/${eventId}/guest-list`);
   }
 
+  // Guest list export
+  async exportGuestListCSV(eventId: number): Promise<void> {
+    const url = `${this.baseURL}/api/events/${eventId}/guest-list/export`;
+    const token = this.getToken();
+
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new ApiError(data.error || 'Export failed', response.status, data);
+    }
+
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    const disposition = response.headers.get('Content-Disposition');
+    a.download = disposition?.split('filename=')[1] || `guest_list_${eventId}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+  }
+
   // Chat endpoint
   async sendChatMessage(message: string): Promise<ApiResponse & { response: string }> {
     return this.request('/api/chat/message', {

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   Home,
   Calendar,
+  CalendarDays,
   Building2,
   UserPlus,
   Mail,
@@ -71,6 +72,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           name: 'Browse Events',
           href: '/events',
           icon: Eye,
+          show: true,
+        },
+        {
+          name: 'Calendar',
+          href: '/events/calendar',
+          icon: CalendarDays,
           show: true,
         },
         {

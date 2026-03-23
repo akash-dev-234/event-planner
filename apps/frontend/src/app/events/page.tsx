@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { fetchEvents, setCurrentFilter, setCategoryFilter, clearFilters } from '@/lib/redux/features/eventsSlice';
-import { Calendar, Search, Filter, Plus, Eye, MapPin, Clock, Building2, User, Mail, UserPlus, X, CalendarDays, Tag, Users, CheckCircle2, XCircle, Clock as ClockPending } from 'lucide-react';
+import { Calendar, Search, Filter, Plus, Eye, MapPin, Clock, Building2, User, Mail, UserPlus, X, CalendarDays, Tag, Users, CheckCircle2, XCircle, Clock as ClockPending, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useReduxToast } from '@/hooks/useReduxToast';
@@ -190,14 +190,22 @@ export default function EventsPage() {
               Discover and manage events in your organization and community
             </p>
           </div>
-          {(user?.role === 'organizer' || user?.role === 'admin') && (
-            <Link href="/events/create">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Event
+          <div className="flex gap-2">
+            <Link href="/events/calendar">
+              <Button variant="outline">
+                <CalendarDays className="h-4 w-4 mr-2" />
+                Calendar View
               </Button>
             </Link>
-          )}
+            {(user?.role === 'organizer' || user?.role === 'admin') && (
+              <Link href="/events/create">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Event
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Filters */}

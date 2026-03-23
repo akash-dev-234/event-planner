@@ -27,12 +27,15 @@ import {
   Mail,
   CheckCircle2,
   XCircle,
-  Clock as ClockPending
+  Clock as ClockPending,
+  Download
 } from 'lucide-react';
+import { apiClient } from '@/lib/api';
 
 export default function EventDetailsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   const router = useRouter();
   const params = useParams();
@@ -262,10 +265,31 @@ export default function EventDetailsPage() {
             {canEdit && currentEvent.guest_counts && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Guest List
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Guest List
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isExporting}
+                      onClick={async () => {
+                        setIsExporting(true);
+                        try {
+                          await apiClient.exportGuestListCSV(currentEvent.id);
+                          success('Export Complete', 'Guest list CSV downloaded.');
+                        } catch {
+                          errorToast('Export Failed', 'Could not export guest list.');
+                        } finally {
+                          setIsExporting(false);
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {isExporting ? 'Exporting...' : 'Export CSV'}
+                    </Button>
+                  </div>
                   <CardDescription>
                     Invitations sent and responses for this event
                   </CardDescription>

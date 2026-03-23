@@ -54,19 +54,61 @@ def create_app():
     database_url = os.environ.get('DATABASE_URL')
     if database_url:
         # Using PostgreSQL (Supabase or other)
-        # Convert to psycopg3 dialect (postgresql+psycopg://)
-        if database_url.startswith('postgresql://'):
-            database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
-        elif database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql+psycopg://', 1)
+        # Parse DATABASE_URL manually to handle special characters in password
+        import re
+        from sqlalchemy.engine import URL as SaURL
 
-        # Add sslmode to URL if not present (required for Supabase)
-        if '?' not in database_url:
-            database_url += '?sslmode=require'
-        elif 'sslmode' not in database_url:
-            database_url += '&sslmode=require'
+        # Match: scheme://user:password@host:port/dbname
+        # Use regex that captures password as everything between first : after user and last @
+        match = re.match(
+            r'^(?:postgresql|postgres)(?:\+\w+)?://'  # scheme
+            r'([^:]+)'                                 # username (no colons)
+            r':(.+)'                                   # :password (greedy, may contain anything)
+            r'@([^:/?]+)'                              # @host
+            r':(\d+)'                                  # :port
+            r'/(.+?)$',                                # /dbname (and optional query)
+            database_url
+        )
 
-        app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+        if match:
+            username, password, host, port, dbname = match.groups()
+            print(f"[DB] Regex matched: user={username}, host={host}, port={port}")
+            # Split dbname from query params
+            if '?' in dbname:
+                dbname, query = dbname.split('?', 1)
+            else:
+                query = None
+
+            query_args = {'sslmode': 'require'}
+            if query:
+                for param in query.split('&'):
+                    if '=' in param:
+                        k, v = param.split('=', 1)
+                        query_args[k] = v
+
+            sa_url = SaURL.create(
+                drivername='postgresql+psycopg',
+                username=username,
+                password=password,
+                host=host,
+                port=int(port),
+                database=dbname,
+                query=query_args,
+            )
+            app.config["SQLALCHEMY_DATABASE_URI"] = sa_url
+            print(f"✅ Using PostgreSQL database at {host}:{port}")
+        else:
+            # Fallback: try using URL as-is with dialect replacement
+            if database_url.startswith('postgresql://'):
+                database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+            elif database_url.startswith('postgres://'):
+                database_url = database_url.replace('postgres://', 'postgresql+psycopg://', 1)
+            if '?' not in database_url:
+                database_url += '?sslmode=require'
+            elif 'sslmode' not in database_url:
+                database_url += '&sslmode=require'
+            app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+            print("✅ Using PostgreSQL database")
         app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
             "pool_pre_ping": True,  # Verify connections before using
@@ -75,10 +117,6 @@ def create_app():
                 "connect_timeout": 10,
             },
         }
-        # Log host for debugging (hide password)
-        from urllib.parse import urlparse
-        parsed = urlparse(database_url)
-        print(f"✅ Using PostgreSQL database at {parsed.hostname}:{parsed.port}")
     else:
         # Fallback to SQLite for local development
         db_path = os.path.join(backend_dir, 'instance', 'database.db')
@@ -112,6 +150,11 @@ def create_app():
     app.register_blueprint(events_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(organization_bp)
+
+    # Start reminder scheduler (only in main process, not in reloader)
+    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        from scheduler import init_scheduler
+        init_scheduler(app)
 
     @app.route("/")
     def home():

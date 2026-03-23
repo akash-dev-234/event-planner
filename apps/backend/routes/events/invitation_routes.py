@@ -1,5 +1,7 @@
+import csv
+import io
 from datetime import datetime, timezone
-from flask import request, jsonify
+from flask import request, jsonify, Response
 from flask_jwt_extended import get_jwt, jwt_required
 
 from . import events_bp
@@ -165,6 +167,56 @@ def get_event_guest_list(event_id):
     except Exception as e:
         return jsonify({
             "error": "Failed to get guest list",
+            "details": str(e)
+        }), 500
+
+
+@events_bp.route("/<int:event_id>/guest-list/export", methods=["GET"])
+@jwt_required()
+@role_required("organizer", "admin")
+def export_guest_list_csv(event_id):
+    """Export guest list as CSV file"""
+    try:
+        jwt_data = get_jwt()
+        user_id = jwt_data.get('user_id')
+        user = User.query.get(user_id)
+
+        event = Event.query.get(event_id)
+        if not event or event.is_deleted:
+            return jsonify({"error": "Event not found"}), 404
+
+        if event.user_id != user_id and user.role != 'admin':
+            return jsonify({"error": "Access denied"}), 403
+
+        invitations = EventInvitation.query.filter_by(event_id=event_id).all()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Name', 'Email', 'Status', 'Invited At', 'Responded At'])
+
+        for inv in invitations:
+            writer.writerow([
+                inv.guest_name or '',
+                inv.guest_email,
+                inv.status,
+                inv.created_at.isoformat() if inv.created_at else '',
+                inv.responded_at.isoformat() if inv.responded_at else ''
+            ])
+
+        output.seek(0)
+        safe_title = ''.join(c if c.isalnum() or c in (' ', '-', '_') else '' for c in event.title).strip().replace(' ', '_')[:30]
+
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=guest_list_{safe_title}_{event_id}.csv'
+            }
+        )
+
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to export guest list",
             "details": str(e)
         }), 500
 

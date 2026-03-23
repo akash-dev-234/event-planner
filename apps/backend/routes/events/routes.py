@@ -581,6 +581,19 @@ def delete_event(event_id):
 
 # Additional admin routes for event management
 
+@events.route("/admin/trigger-reminders", methods=["POST"])
+@role_required("admin")
+def trigger_reminders():
+    """Admin-only: manually trigger reminder check for testing"""
+    try:
+        from flask import current_app
+        from scheduler import check_and_send_reminders
+        check_and_send_reminders(current_app._get_current_object())
+        return jsonify({"message": "Reminder check triggered successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to trigger reminders: {str(e)}"}), 500
+
+
 @events.route("/admin/all", methods=["GET"])
 @role_required("admin")
 def admin_get_all_events():
