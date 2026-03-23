@@ -71,8 +71,14 @@ def create_app():
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
             "pool_pre_ping": True,  # Verify connections before using
             "pool_recycle": 300,    # Recycle connections after 5 minutes
+            "connect_args": {
+                "connect_timeout": 10,
+            },
         }
-        print(f"✅ Using PostgreSQL database")
+        # Log host for debugging (hide password)
+        from urllib.parse import urlparse
+        parsed = urlparse(database_url)
+        print(f"✅ Using PostgreSQL database at {parsed.hostname}:{parsed.port}")
     else:
         # Fallback to SQLite for local development
         db_path = os.path.join(backend_dir, 'instance', 'database.db')
@@ -117,7 +123,11 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     with app.app_context():
-        db.create_all()  # Create database tables
+        try:
+            db.create_all()
+            print("✅ Database tables created successfully")
+        except Exception as e:
+            print(f"⚠️  Database initialization failed: {e}")
     # Use PORT from environment (Render) or default to 5001 for local
     port = int(os.environ.get('PORT', 5001))
     debug = os.environ.get('FLASK_ENV') != 'production'
